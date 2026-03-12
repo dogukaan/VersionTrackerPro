@@ -39,6 +39,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
+          # We use assembleDebug but ensure it's bundled, or assembleRelease with debug signing
           ./gradlew assembleDebug --no-daemon
 
       - name: 📤 Upload Artifact
@@ -51,8 +52,3 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: android/app/build/outputs/apk/debug/app-debug.apk
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
