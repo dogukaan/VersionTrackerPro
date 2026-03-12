@@ -55,7 +55,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
       onRequestClose={onClose}
     >
       <View style={styles.centeredView}>
-        <BlurView intensity={80} tint="dark" style={styles.modalBlur}>
+        <View style={[styles.modalBlur, { backgroundColor: Platform.OS === 'ios' ? 'rgba(30,30,30,0.7)' : 'rgba(28,28,30,0.95)' }]}>
           <View style={styles.modalView}>
             <View style={styles.header}>
               <View style={styles.titleGroup}>
@@ -150,7 +150,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
               </TouchableOpacity>
             </View>
           </View>
-        </BlurView>
+        </View>
       </View>
     </Modal>
   );

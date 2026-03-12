@@ -103,9 +103,10 @@ export const downloadAndInstallApk = async (apkUrl, fileName, onProgress, token 
     
     if (Platform.OS === 'android') {
       const contentUri = await FileSystem.getContentUriAsync(uri);
-      await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
         data: contentUri,
         flags: 1,
+        type: 'application/vnd.android.package-archive'
       });
     } else {
       await Sharing.shareAsync(uri);
