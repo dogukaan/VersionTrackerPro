@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { X, Download, Box, FileText } from 'lucide-react-native';
-import Markdown from 'react-native-markdown-display';
-import { fetchFileContent } from '../services/githubService';
+import { X, Download, Box, FileText, GitCommit, Clock, User, Calendar } from 'lucide-react-native';
+import { fetchFileContent, fetchCommits } from '../services/githubService';
+
+import MarkdownRenderer from './MarkdownRenderer';
 
 export const VersionModal = ({ visible, version, onClose, onInstall, downloading, token }) => {
   const [fullNotes, setFullNotes] = useState('');
+  const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -24,7 +26,12 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
 
   const loadRepoChangelog = async () => {
     setLoading(true);
-    // Try common names
+    
+    // First, always fetch recent commits for this tag/version to be sure
+    const recentCommits = await fetchCommits(version.repoOwner, version.repoName, version.version, token);
+    setCommits(recentCommits);
+
+    // Try common names for CHANGELOG.md if notes are generic
     const files = ['CHANGELOG.md', 'changelog.md', 'CHANGES.md'];
     for (const file of files) {
       const content = await fetchFileContent(version.repoOwner, version.repoName, file, token);
@@ -34,7 +41,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
         return;
       }
     }
-    setFullNotes(version.notes || 'Bu sürüm için detaylı not bırakılmamış.');
+    setFullNotes(version.notes || '');
     setLoading(false);
   };
 
@@ -69,12 +76,52 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
               {loading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator color="#007AFF" />
-                  <Text style={styles.loadingText}>CHANGELOG.md getiriliyor...</Text>
+                  <Text style={styles.loadingText}>Veriler getiriliyor...</Text>
                 </View>
               ) : (
-                <Markdown style={markdownStyles}>
-                  {fullNotes}
-                </Markdown>
+                <>
+                  {fullNotes ? (
+                    <MarkdownRenderer style={markdownStyles}>
+                      {fullNotes}
+                    </MarkdownRenderer>
+                  ) : null}
+
+                  {commits.length > 0 && (
+                    <View style={styles.commitsContainer}>
+                      <View style={[styles.changelogHeader, { marginTop: 20 }]}>
+                        <GitCommit size={16} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.changelogTitle}>SON DEĞİŞİKLİKLER (COMMITS)</Text>
+                      </View>
+                      {commits.map((commit, index) => (
+                        <View key={index} style={styles.commitItem}>
+                          <View style={styles.commitDot} />
+                          <View style={styles.commitContent}>
+                            <Text style={styles.commitMessage} numberOfLines={2}>
+                              {commit.message}
+                            </Text>
+                            <View style={styles.commitMeta}>
+                              <View style={styles.metaBadge}>
+                                <User size={10} color="#888" />
+                                <Text style={styles.metaText}>{commit.author}</Text>
+                              </View>
+                              <View style={styles.metaBadge}>
+                                <Clock size={10} color="#888" />
+                                <Text style={styles.metaText}>{new Date(commit.date).toLocaleDateString('tr-TR')}</Text>
+                              </View>
+                              <View style={styles.metaBadge}>
+                                <Text style={[styles.metaText, { color: '#007AFF', fontFamily: 'monospace' }]}>{commit.sha}</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {!fullNotes && commits.length === 0 && (
+                    <Text style={styles.changelogText}>Bu sürüm için detaylı not veya commit bulunamadı.</Text>
+                  )}
+                </>
               )}
             </ScrollView>
 
@@ -187,6 +234,12 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginLeft: 8,
   },
+  changelogText: {
+    color: '#fff',
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
@@ -241,5 +294,49 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 17,
     letterSpacing: -0.5,
+  },
+  commitsContainer: {
+    paddingBottom: 10,
+  },
+  commitItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    paddingLeft: 4,
+  },
+  commitDot: {
+    width: 2,
+    backgroundColor: '#007AFF',
+    marginRight: 16,
+    borderRadius: 1,
+    opacity: 0.5,
+  },
+  commitContent: {
+    flex: 1,
+  },
+  commitMessage: {
+    color: '#eee',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  commitMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  metaText: {
+    color: '#888',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

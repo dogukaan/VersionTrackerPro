@@ -65,3 +65,44 @@ export const fetchFileContent = async (repoOwner, repoName, path, token = null) 
     return null;
   }
 };
+
+export const fetchCommits = async (repoOwner, repoName, sha, token = null) => {
+  try {
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    };
+    if (token) {
+      headers['Authorization'] = token.startsWith('ghp_') || token.startsWith('github_pat_') 
+        ? `token ${token}` 
+        : `Bearer ${token}`;
+    }
+
+    // sha can be a tag name, branch name, or commit SHA
+    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/commits?sha=${sha}&per_page=10`, { headers });
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    return data
+      .map(c => ({
+        sha: c.sha.substring(0, 7),
+        message: c.commit.message,
+        author: c.commit.author.name,
+        date: c.commit.author.date,
+        url: c.html_url
+      }))
+      .filter(c => {
+        const msg = c.message.toLowerCase();
+        return !msg.includes('chore') && 
+               !msg.includes('pipeline') && 
+               !msg.includes('ci/cd') && 
+               !msg.includes('update build-android.yml') &&
+               !msg.includes('bundled release build') &&
+               !msg.includes('update workspace') &&
+               !msg.includes('merge');
+      });
+  } catch (error) {
+    console.error('Error fetching commits:', error);
+    return [];
+  }
+};
