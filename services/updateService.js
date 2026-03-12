@@ -23,21 +23,24 @@ export const downloadAndInstallApk = async (apkUrl, fileName, onProgress, token 
       try {
         console.log('[UpdateService] Resolving redirect URL...');
         const response = await fetch(apkUrl, {
-          method: 'GET',
+          method: 'GET', // GitHub API Asset Redirect usually works with GET
           headers,
-          redirect: 'follow' // Let fetch handle the redirect to get the final URL
+          redirect: 'manual' // We want to catch the redirect ourselves
         });
         
-        if (!response.ok) {
-          throw new Error(`GitHub API error: ${response.status}`);
+        // GitHub returns 302 for asset redirects
+        if (response.status === 302 || response.status === 301) {
+          const location = response.headers.get('location');
+          if (location) {
+            finalUrl = location;
+            console.log('[UpdateService] Final URL resolved from Location header');
+          }
+        } else if (response.ok) {
+          finalUrl = response.url;
+          console.log('[UpdateService] Final URL resolved from response.url');
         }
-        
-        // The final URL after redirects (e.g. S3 URL)
-        finalUrl = response.url;
-        console.log('[UpdateService] Final URL resolved');
       } catch (err) {
         console.error('[UpdateService] Redirect resolution failed:', err);
-        // Fallback: keep using the original apkUrl and hope for the best
       }
     }
   }
