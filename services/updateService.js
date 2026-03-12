@@ -18,26 +18,19 @@ export const downloadAndInstallApk = async (apkUrl, fileName, onProgress, token 
     headers['Authorization'] = authHeader;
     headers['Accept'] = 'application/octet-stream';
 
-    // Robust way: First try to get the redirect URL if we're hitting the API
-    if (apkUrl.includes('api.github.com')) {
+    // Robust way: Resolve redirect for GitHub API asset URLs
+    if (apkUrl.includes('api.github.com/repos') && apkUrl.includes('/assets/')) {
       try {
-        console.log('[UpdateService] Resolving redirect URL...');
+        console.log('[UpdateService] Resolving asset redirect...');
         const response = await fetch(apkUrl, {
-          method: 'GET', // GitHub API Asset Redirect usually works with GET
+          method: 'GET',
           headers,
-          redirect: 'manual' // We want to catch the redirect ourselves
+          redirect: 'follow'
         });
         
-        // GitHub returns 302 for asset redirects
-        if (response.status === 302 || response.status === 301) {
-          const location = response.headers.get('location');
-          if (location) {
-            finalUrl = location;
-            console.log('[UpdateService] Final URL resolved from Location header');
-          }
-        } else if (response.ok) {
+        if (response.ok) {
           finalUrl = response.url;
-          console.log('[UpdateService] Final URL resolved from response.url');
+          console.log('[UpdateService] Asset redirect resolved to final URL');
         }
       } catch (err) {
         console.error('[UpdateService] Redirect resolution failed:', err);

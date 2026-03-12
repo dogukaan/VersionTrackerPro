@@ -1,3 +1,4 @@
+import 'punycode';
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   StyleSheet, 

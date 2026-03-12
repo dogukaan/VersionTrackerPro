@@ -109,6 +109,9 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
                                 <Text style={styles.metaText}>{new Date(commit.date).toLocaleDateString('tr-TR')}</Text>
                               </View>
                               <View style={styles.metaBadge}>
+                                <Text style={styles.metaText}>{commit.date ? new Date(commit.date).toLocaleDateString('tr-TR') : 'Bilinmiyor'}</Text>
+                              </View>
+                              <View style={styles.metaBadge}>
                                 <Text style={[styles.metaText, { color: '#007AFF', fontFamily: 'monospace' }]}>{commit.sha}</Text>
                               </View>
                             </View>
@@ -128,7 +131,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
             <View style={styles.footer}>
               <View style={styles.infoRow}>
                 <Box size={16} color="#888" />
-                <Text style={styles.infoText}>{Math.round(version.apkAsset.size / 1024 / 1024)} MB</Text>
+                <Text style={styles.infoText}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
               </View>
               
               <TouchableOpacity 
