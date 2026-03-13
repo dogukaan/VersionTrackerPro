@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
-import { BlurView } from 'expo-blur';
+// expo-blur removed for Android stability
 import { X, Download, Box, FileText, GitCommit, Clock, User, Calendar } from 'lucide-react-native';
 import { fetchFileContent, fetchCommits } from '../services/githubService';
 
@@ -106,10 +106,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
                               </View>
                               <View style={styles.metaBadge}>
                                 <Clock size={10} color="#888" />
-                                <Text style={styles.metaText}>{new Date(commit.date).toLocaleDateString('tr-TR')}</Text>
-                              </View>
-                              <View style={styles.metaBadge}>
-                                <Text style={styles.metaText}>{commit.date ? new Date(commit.date).toLocaleDateString('tr-TR') : 'Bilinmiyor'}</Text>
+                                <Text style={styles.metaText}>{commit.date ? new Date(commit.date).toLocaleDateString('tr-TR') : 'Tarih Yok'}</Text>
                               </View>
                               <View style={styles.metaBadge}>
                                 <Text style={[styles.metaText, { color: '#007AFF', fontFamily: 'monospace' }]}>{commit.sha}</Text>
