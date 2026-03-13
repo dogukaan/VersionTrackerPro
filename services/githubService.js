@@ -120,3 +120,26 @@ export const fetchCommits = async (repoOwner, repoName, sha, token = null) => {
     return [];
   }
 };
+
+/**
+ * Fetches latest workflow runs to track build status
+ */
+export const fetchWorkflowRuns = async (owner, repo, token = null) => {
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=10`;
+  const headers = { 'Accept': 'application/vnd.github+json' };
+  if (token) {
+    headers['Authorization'] = token.startsWith('ghp_') || token.startsWith('github_pat_') 
+      ? `token ${token}` 
+      : `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.workflow_runs || [];
+  } catch (error) {
+    console.error('[GithubService] Workflow runs fetch failed:', error);
+    return [];
+  }
+};

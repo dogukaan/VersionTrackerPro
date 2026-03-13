@@ -39,9 +39,10 @@ import {
 
 // Services & Components
 import { storageService } from './services/storageService';
-import { fetchReleases } from './services/githubService';
+import { fetchReleases, fetchWorkflowRuns } from './services/githubService';
 import { downloadAndInstallApk } from './services/updateService';
 import { registerBackgroundTasks } from './services/backgroundService';
+import { sendLocalNotification, requestNotificationPermissions } from './services/notificationService';
 import * as Notifications from 'expo-notifications';
 import { GlassCard } from './components/GlassCard';
 import { VersionModal } from './components/VersionModal';
@@ -67,7 +68,8 @@ export default function App() {
   const [downloadingId, setDownloadingId] = useState(null);
   const [progress, setProgress] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
-  const [cachedApks, setCachedApks] = useState({}); // { fileName: true }
+  const [cachedApks, setCachedApks] = useState({}); // { uniqueName: true }
+  const [workflowRuns, setWorkflowRuns] = useState({}); // { repoId: lastRuns }
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Theme Config
@@ -96,7 +98,7 @@ export default function App() {
 
   const setupApp = async () => {
     await registerBackgroundTasks();
-    await Notifications.requestPermissionsAsync();
+    await requestNotificationPermissions();
   };
 
   const loadRepos = async () => {
@@ -115,9 +117,8 @@ export default function App() {
     const status = {};
     for (const rel of releases) {
       if (rel.apkAsset) {
-        // Use version-prefixed name for unique caching
         const uniqueName = `${rel.version}_${rel.apkAsset.name}`;
-        status[rel.apkAsset.name] = await isApkDownloaded(uniqueName);
+        status[uniqueName] = await isApkDownloaded(uniqueName);
       }
     }
     setCachedApks(status);
@@ -126,20 +127,60 @@ export default function App() {
   const checkAllForUpdates = async (repoList) => {
     for (const repo of repoList) {
       try {
+        // Build Status Tracking
+        const runs = await fetchWorkflowRuns(repo.owner, repo.name, repo.token);
+        if (runs.length > 0) {
+          const latestRun = runs[0];
+          const prevRuns = workflowRuns[repo.id] || [];
+          const prevRun = prevRuns[0];
+
+          // Notify on status change ( queued -> in_progress -> completed )
+          if (prevRun && (latestRun.status !== prevRun.status || latestRun.conclusion !== prevRun.conclusion)) {
+            let title = `Build Durumu: ${repo.name}`;
+            let body = `Durum değişti: ${latestRun.status === 'in_progress' ? 'İşleniyor' : latestRun.status}`;
+            
+            if (latestRun.conclusion === 'success') {
+              body = 'Build başarıyla tamamlandı! APK indirilebilir.';
+            } else if (latestRun.conclusion === 'failure') {
+              body = 'Build başarısız oldu.';
+            } else if (latestRun.status === 'in_progress') {
+              body = 'Build işlemi başladı...';
+            }
+            
+            await sendLocalNotification(title, body);
+          }
+          
+          setWorkflowRuns(prev => ({ ...prev, [repo.id]: runs }));
+        }
+
         const results = await fetchReleases(repo.owner, repo.name, repo.token);
         if (results.length > 0) {
           const latest = results[0];
           if (latest.version !== repo.lastVersion) {
             console.log(`Update found for ${repo.path}: ${latest.version}`);
-            handleInstall(latest, repo.token);
+            await sendLocalNotification('Yeni Versiyon!', `${repo.name} için ${latest.version} yayınlandı.`);
             await storageService.updateRepoVersion(repo.id, latest.version);
+            setRepos(await storageService.getRepos());
           }
         }
       } catch (err) {
-        console.error(`Quick check failed for ${repo.path}`, err);
+        console.error(`Status check failed for ${repo.path}`, err);
       }
     }
   };
+
+  // Polling for build status (every 1 minute when app is active)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (repos.length > 0) checkAllForUpdates(repos);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [repos, workflowRuns]);
+
+  // Refresh local cache status when releases change
+  useEffect(() => {
+    checkLocalFiles();
+  }, [releases]);
 
   const handleAddRepo = async () => {
     if (!newRepoPath.includes('/')) {
@@ -263,8 +304,19 @@ export default function App() {
 
   const renderReleaseItem = ({ item }) => {
     if (!item) return null;
-    const isDownloaded = cachedApks[item.apkAsset?.name];
+    const uniqueName = `${item.version}_${item.apkAsset?.name}`;
+    const isDownloaded = cachedApks[uniqueName];
     const isDownloading = downloadingId === item.id;
+
+    // Check if there is an active build for this repo that might be this release
+    const repoRuns = workflowRuns[selectedRepo?.id] || [];
+    const activeRun = repoRuns.find(run => 
+      (run.status === 'in_progress' || run.status === 'queued') && 
+      (item.version.includes(run.head_branch) || run.display_title.includes(item.version))
+    );
+    
+    // If no asset yet but a build is running, show Building
+    const isBuilding = !item.apkAsset && activeRun;
 
     return (
       <TouchableOpacity onPress={() => { setSelectedVersion(item); setModalVisible(true); }} activeOpacity={0.8}>
@@ -272,8 +324,9 @@ export default function App() {
           <View style={styles.releaseLeft}>
             <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version || 'Bilinmiyor'}</Text>
             <Text style={[styles.releaseDate, { color: theme.subText }]}>
-              {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : ''}
+              {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : 'Yayınlanıyor...'}
               {isDownloaded && <Text style={{ color: theme.success, fontWeight: '900' }}> • İNDİRİLDİ</Text>}
+              {isBuilding && <Text style={{ color: theme.accent, fontWeight: '900' }}> • BUILD EDİLİYOR</Text>}
             </Text>
           </View>
           <View style={styles.releaseRight}>
@@ -282,21 +335,32 @@ export default function App() {
                 <ActivityIndicator size="small" color={theme.accent} />
                 <Text style={[styles.progressText, { color: theme.accent }]}>%{Math.round(progress * 100)}</Text>
               </View>
+            ) : isBuilding ? (
+              <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg }]}>
+                <ActivityIndicator size="small" color={theme.accent} />
+                <Text style={[styles.progressText, { color: theme.accent, marginLeft: 8 }]}>Derleniyor</Text>
+              </View>
             ) : (
               <View style={styles.actionButtonGroup}>
-                <TouchableOpacity 
-                  style={[
-                    styles.actionButton, 
-                    isDownloaded ? { backgroundColor: theme.accent } : { backgroundColor: theme.success }
-                  ]}
-                  onPress={() => handleInstall(item, selectedRepo?.token)}
-                >
-                  {isDownloaded ? (
-                    <Box size={20} color="#fff" />
-                  ) : (
-                    <Download size={20} color="#fff" />
-                  )}
-                </TouchableOpacity>
+                {item.apkAsset ? (
+                  <TouchableOpacity 
+                    style={[
+                      styles.actionButton, 
+                      isDownloaded ? { backgroundColor: theme.accent } : { backgroundColor: theme.success }
+                    ]}
+                    onPress={() => handleInstall(item, selectedRepo?.token)}
+                  >
+                    {isDownloaded ? (
+                      <Box size={20} color="#fff" />
+                    ) : (
+                      <Download size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.actionButton, { backgroundColor: theme.iconBg }]}>
+                     <RefreshCw size={18} color={theme.subText} />
+                  </View>
+                )}
                 <TouchableOpacity 
                   style={[styles.actionButton, styles.detailButton, { backgroundColor: theme.iconBg }]}
                   onPress={() => {
