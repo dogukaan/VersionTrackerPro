@@ -14,7 +14,8 @@ import {
   Dimensions,
   LayoutAnimation,
   UIManager,
-  RefreshControl
+  RefreshControl,
+  BackHandler
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
@@ -103,6 +104,32 @@ export default function App() {
     await requestNotificationPermissions();
   };
 
+  // Hardware Back Button Handling
+  useEffect(() => {
+    const backAction = () => {
+      if (modalVisible) {
+        setModalVisible(false);
+        return true;
+      }
+      if (showAddModal) {
+        setShowAddModal(false);
+        return true;
+      }
+      if (currentScreen === 'detail') {
+        navigateBack();
+        return true;
+      }
+      return false; // Exit app
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [currentScreen, modalVisible, showAddModal]);
+
   const loadRepos = async () => {
     const savedRepos = await storageService.getRepos();
     setRepos(savedRepos);
@@ -143,6 +170,10 @@ export default function App() {
             
             if (latestRun.conclusion === 'success') {
               body = 'Build başarıyla tamamlandı! APK indirilebilir.';
+              // If we are in detail view of THIS repo, refresh releases automatically
+              if (currentScreen === 'detail' && selectedRepo?.id === repo.id) {
+                handleSelectRepo(repo);
+              }
             } else if (latestRun.conclusion === 'failure') {
               body = 'Build başarısız oldu.';
             } else if (latestRun.status === 'in_progress') {
@@ -231,10 +262,45 @@ export default function App() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     
     try {
-      const results = await fetchReleases(repo.owner, repo.name, repo.token);
-      setReleases(results);
-      if (results.length > 0) {
-        await storageService.updateRepoVersion(repo.id, results[0].version);
+      const runs = await fetchWorkflowRuns(repo.owner, repo.name, repo.token);
+      setWorkflowRuns(prev => ({ ...prev, [repo.id]: runs }));
+
+      const releaseResults = await fetchReleases(repo.owner, repo.name, repo.token);
+      
+      // Merge active builds into releases if they don't have a release yet
+      const mergedReleases = [...releaseResults];
+      
+      const activeRuns = runs.filter(run => 
+        (run.status === 'in_progress' || run.status === 'queued')
+      );
+
+      for (const run of activeRuns) {
+        // Find if this run already has a release in the list
+        // It could be matched by branch name or display title
+        const runIdent = run.display_title || run.head_branch || '';
+        const alreadyHasRelease = releaseResults.some(rel => 
+          rel.version === runIdent || rel.version === run.head_branch
+        );
+
+        if (!alreadyHasRelease && runIdent) {
+          mergedReleases.unshift({
+            id: `run-${run.id}`,
+            version: runIdent,
+            name: run.display_title || 'Yeni Build',
+            notes: `GitHub Actions Build: ${run.html_url}\nSHA: ${run.head_sha}`,
+            publishedAt: null, // Indicates it's not a release yet
+            repoOwner: repo.owner,
+            repoName: repo.name,
+            isDraft: true,
+            workflowRun: run
+          });
+        }
+      }
+
+      setReleases(mergedReleases);
+      
+      if (releaseResults.length > 0) {
+        await storageService.updateRepoVersion(repo.id, releaseResults[0].version);
         setRepos(await storageService.getRepos());
       }
     } catch (err) {
