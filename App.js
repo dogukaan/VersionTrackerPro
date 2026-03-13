@@ -13,7 +13,8 @@ import {
   Alert,
   Dimensions,
   LayoutAnimation,
-  UIManager
+  UIManager,
+  RefreshControl
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
@@ -70,6 +71,7 @@ export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
   const [cachedApks, setCachedApks] = useState({}); // { uniqueName: true }
   const [workflowRuns, setWorkflowRuns] = useState({}); // { repoId: lastRuns }
+  const [refreshing, setRefreshing] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Theme Config
@@ -275,6 +277,16 @@ export default function App() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (currentScreen === 'home') {
+      await loadRepos();
+    } else {
+      await handleSelectRepo(selectedRepo);
+    }
+    setRefreshing(false);
+  };
+
   // Renderers
   const renderRepoItem = ({ item }) => (
     <TouchableOpacity onPress={() => handleSelectRepo(item)} activeOpacity={0.7}>
@@ -312,7 +324,12 @@ export default function App() {
     const repoRuns = workflowRuns[selectedRepo?.id] || [];
     const activeRun = repoRuns.find(run => 
       (run.status === 'in_progress' || run.status === 'queued') && 
-      (item.version.includes(run.head_branch) || run.display_title.includes(item.version))
+      (
+        item.version === run.head_branch || 
+        item.version === run.display_title || 
+        (run.head_sha && item.notes?.includes(run.head_sha)) ||
+        (run.head_branch && item.version.includes(run.head_branch))
+      )
     );
     
     // If no asset yet but a build is running, show Building
@@ -442,6 +459,9 @@ export default function App() {
                   keyExtractor={item => item.id}
                   contentContainerStyle={styles.listPadding}
                   showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />
+                  }
                 />
               )
             ) : (
@@ -457,6 +477,9 @@ export default function App() {
                     keyExtractor={item => item.id.toString()}
                     contentContainerStyle={styles.listPadding}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />
+                    }
                   />
                 )}
               </View>
