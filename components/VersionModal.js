@@ -55,7 +55,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
       onRequestClose={onClose}
     >
       <View style={styles.centeredView}>
-        <View style={[styles.modalBlur, { backgroundColor: Platform.OS === 'ios' ? 'rgba(30,30,30,0.7)' : 'rgba(28,28,30,0.95)' }]}>
+        <View style={[styles.modalBlur, { backgroundColor: '#fff' }]}>
           <View style={styles.modalView}>
             <View style={styles.header}>
               <View style={styles.titleGroup}>
@@ -63,7 +63,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
                 <Text style={styles.releaseName}>{version.name}</Text>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <X color="#fff" size={24} />
+                <X color="#333" size={24} />
               </TouchableOpacity>
             </View>
 
@@ -155,16 +155,16 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
 
 const markdownStyles = {
   body: {
-    color: '#fff',
+    color: '#000',
     fontSize: 16,
     lineHeight: 24,
   },
   heading1: { color: '#007AFF', fontWeight: '900', marginVertical: 10 },
-  heading2: { color: '#fff', fontWeight: '800', marginVertical: 8 },
+  heading2: { color: '#000', fontWeight: '800', marginVertical: 8 },
   link: { color: '#007AFF', textDecorationLine: 'underline' },
-  strong: { fontWeight: '800', color: '#fff' },
-  bullet_list: { color: '#fff' },
-  list_item: { color: '#fff', marginVertical: 4 },
+  strong: { fontWeight: '800', color: '#000' },
+  bullet_list: { color: '#000' },
+  list_item: { color: '#000', marginVertical: 4 },
 };
 
 const styles = StyleSheet.create({
@@ -175,12 +175,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalBlur: {
-    width: '90%',
+    width: '94%',
     maxHeight: '85%',
     borderRadius: 36,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
+    elevation: 10,
   },
   modalView: {
     padding: 28,
@@ -195,13 +200,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   versionTag: {
-    color: '#007AFF',
-    fontSize: 28,
+    color: '#000',
+    fontSize: 32,
     fontWeight: '900',
     letterSpacing: -1.5,
   },
   releaseName: {
-    color: '#fff',
+    color: '#8E8E93',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 4,
@@ -211,11 +216,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F2F2F7',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   scrollView: {
     maxHeight: 450,
@@ -227,7 +230,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   changelogTitle: {
-    color: 'rgba(255,255,255,0.4)',
+    color: '#8E8E93',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -235,7 +238,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   changelogText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '400',
@@ -256,38 +259,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 24,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: '#F2F2F7',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: '#F2F2F7',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
   },
   infoText: {
-    color: '#aaa',
+    color: '#8E8E93',
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
   },
   installButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#007AFF', // Reverting to Blue for Premium Light
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 32,
     paddingVertical: 18,
     borderRadius: 20,
-    shadowColor: '#34C759',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 8,
   },
   disabledButton: {
-    backgroundColor: '#222',
-    opacity: 0.5,
+    backgroundColor: '#E5E5EA',
   },
   installButtonText: {
     color: '#fff',
@@ -308,13 +310,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     marginRight: 16,
     borderRadius: 1,
-    opacity: 0.5,
+    opacity: 0.2,
   },
   commitContent: {
     flex: 1,
   },
   commitMessage: {
-    color: '#eee',
+    color: '#1C1C1E',
     fontSize: 15,
     fontWeight: '600',
     lineHeight: 20,
@@ -328,14 +330,14 @@ const styles = StyleSheet.create({
   metaBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: '#F2F2F7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     gap: 4,
   },
   metaText: {
-    color: '#888',
+    color: '#8E8E93',
     fontSize: 11,
     fontWeight: '700',
   },

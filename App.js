@@ -39,8 +39,10 @@ import { storageService } from './services/storageService';
 import { fetchReleases } from './services/githubService';
 import { downloadAndInstallApk } from './services/updateService';
 import { registerBackgroundTasks } from './services/backgroundService';
+import * as Notifications from 'expo-notifications';
 import { GlassCard } from './components/GlassCard';
 import { VersionModal } from './components/VersionModal';
+import { isApkDownloaded } from './services/updateService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -61,6 +63,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [cachedApks, setCachedApks] = useState({}); // { fileName: true }
 
   // Form State
   const [newRepoPath, setNewRepoPath] = useState('');
@@ -69,15 +73,34 @@ export default function App() {
   // Initialization
   useEffect(() => {
     loadRepos();
-    registerBackgroundTasks();
+    setupApp();
   }, []);
+
+  const setupApp = async () => {
+    await registerBackgroundTasks();
+    await Notifications.requestPermissionsAsync();
+  };
 
   const loadRepos = async () => {
     const savedRepos = await storageService.getRepos();
     setRepos(savedRepos);
+    checkLocalFiles();
     
     // Check for updates on startup
     checkAllForUpdates(savedRepos);
+  };
+
+  const checkLocalFiles = async () => {
+    // Only check if we are in detail view and have releases
+    if (releases.length === 0) return;
+    
+    const status = {};
+    for (const rel of releases) {
+      if (rel.apkAsset) {
+        status[rel.apkAsset.name] = await isApkDownloaded(rel.apkAsset.name);
+      }
+    }
+    setCachedApks(status);
   };
 
   const checkAllForUpdates = async (repoList) => {
@@ -178,6 +201,7 @@ export default function App() {
     } finally {
       setDownloadingId(null);
       setProgress(0);
+      checkLocalFiles(); // Refresh cache status
     }
   };
 
@@ -224,6 +248,7 @@ export default function App() {
             <Text style={styles.versionLabel}>{item.version || 'Bilinmiyor'}</Text>
             <Text style={styles.releaseDate}>
               {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : ''}
+              {cachedApks[item.apkAsset?.name] && <Text style={{ color: '#34C759', fontWeight: '800' }}> • İNDİRİLDİ</Text>}
             </Text>
           </View>
           <View style={styles.releaseRight}>
@@ -235,10 +260,14 @@ export default function App() {
             ) : (
               <View style={styles.actionButtonGroup}>
                 <TouchableOpacity 
-                  style={[styles.actionButton, styles.downloadButton]}
+                  style={[styles.actionButton, styles.downloadButton, cachedApks[item.apkAsset?.name] && { backgroundColor: '#007AFF' }]}
                   onPress={() => handleInstall(item, selectedRepo?.token)}
                 >
-                  <Download size={20} color="#fff" />
+                  {cachedApks[item.apkAsset?.name] ? (
+                    <Box size={20} color="#fff" />
+                  ) : (
+                    <Download size={20} color="#fff" />
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.actionButton, styles.detailButton]}
@@ -247,7 +276,7 @@ export default function App() {
                     setModalVisible(true);
                   }}
                 >
-                  <Info size={22} color="#fff" />
+                  <Info size={22} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             )}
@@ -272,11 +301,11 @@ export default function App() {
           <View style={styles.header}>
             {currentScreen === 'detail' ? (
               <TouchableOpacity onPress={navigateBack} style={styles.backButton}>
-                <ArrowLeft color="#fff" size={24} />
+                <ArrowLeft color="#333" size={24} />
               </TouchableOpacity>
             ) : (
               <View style={styles.headerIcon}>
-                <Github color="#4A90E2" size={32} />
+                <Github color="#000" size={32} />
               </View>
             )}
             <Text style={styles.title}>
@@ -328,10 +357,7 @@ export default function App() {
             )}
           </View>
 
-          {/* Footer Branding */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Version Tracker Pro • Apple Liquid Glass</Text>
-          </View>
+          {/* Footer removed per user request */}
         </SafeAreaView>
 
         {/* Add Repo Modal */}
@@ -385,12 +411,15 @@ export default function App() {
 
         {/* Version Detail Modal */}
         <VersionModal 
-          visible={!!selectedVersion}
+          visible={modalVisible}
           version={selectedVersion}
-          token={selectedRepo?.token}
-          onClose={() => setSelectedVersion(null)}
+          onClose={() => {
+            setModalVisible(false);
+            setSelectedVersion(null);
+          }}
           onInstall={(v) => handleInstall(v, selectedRepo?.token)}
           downloading={downloadingId === selectedVersion?.id}
+          token={selectedRepo?.token}
         />
 
       </View>
@@ -401,7 +430,7 @@ export default function App() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#F2F2F7', // iOS Light background
   },
   safeArea: {
     flex: 1,
@@ -411,7 +440,7 @@ const styles = StyleSheet.create({
     width: 400,
     height: 400,
     borderRadius: 200,
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    backgroundColor: 'rgba(0, 122, 255, 0.05)',
   },
   glow1: {
     top: -100,
@@ -420,7 +449,7 @@ const styles = StyleSheet.create({
   glow2: {
     bottom: -100,
     right: -100,
-    backgroundColor: 'rgba(52, 199, 89, 0.15)',
+    backgroundColor: 'rgba(52, 199,  green, 0.08)',
   },
   header: {
     flexDirection: 'row',
@@ -444,28 +473,33 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#fff',
+    color: '#000',
     letterSpacing: -1.5,
   },
   addButton: {
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#007AFF',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 12,
   },
@@ -482,6 +516,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
     padding: 22,
+    backgroundColor: '#fff',
+    borderRadius: 24,
   },
   repoInfo: {
     flexDirection: 'row',
@@ -492,24 +528,22 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: 'rgba(0, 122, 255, 0.15)',
+    backgroundColor: '#F2F2F7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 122, 255, 0.2)',
   },
   repoTextGroup: {
     flex: 1,
   },
   repoName: {
-    color: '#fff',
+    color: '#000',
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.8,
   },
   repoOwner: {
-    color: 'rgba(255,255,255,0.4)',
+    color: '#8E8E93',
     fontSize: 15,
     marginTop: 4,
     fontWeight: '500',
@@ -519,21 +553,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badge: {
-    backgroundColor: 'rgba(0, 122, 255, 0.25)',
+    backgroundColor: '#007AFF20',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
     marginRight: 12,
   },
   badgeText: {
-    color: '#fff',
+    color: '#007AFF',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   deleteAction: {
     padding: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: '#F2F2F7',
     borderRadius: 12,
   },
   emptyState: {
@@ -543,14 +577,14 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   emptyTitle: {
-    color: '#fff',
+    color: '#000',
     fontSize: 24,
     fontWeight: '900',
     marginBottom: 12,
     letterSpacing: -1,
   },
   emptyDesc: {
-    color: 'rgba(130, 130, 130, 0.8)',
+    color: '#8E8E93',
     fontSize: 17,
     textAlign: 'center',
     maxWidth: '80%',
@@ -564,15 +598,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 18,
     paddingHorizontal: 22,
+    backgroundColor: '#fff',
+    borderRadius: 20,
   },
   versionLabel: {
-    color: '#34C759',
+    color: '#000',
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -1,
   },
   releaseDate: {
-    color: 'rgba(255,255,255,0.3)',
+    color: '#8E8E93',
     fontSize: 14,
     marginTop: 4,
     fontWeight: '600',
@@ -587,21 +623,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   detailButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F2F2F7',
     marginLeft: 8,
   },
   downloadButton: {
-    backgroundColor: 'rgba(52, 199, 89, 0.2)',
-    borderColor: 'rgba(52, 199, 89, 0.3)',
+    backgroundColor: '#34C759',
   },
   downloadProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(52, 199, 89, 0.15)',
+    backgroundColor: '#34C75920',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,

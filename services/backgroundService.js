@@ -5,6 +5,15 @@ import { storageService } from './storageService';
 import { fetchReleases } from './githubService';
 import { downloadAndInstallApk } from './updateService';
 
+// Set notification handler for foreground notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 const BACKGROUND_UPDATE_TASK = 'background-update-check';
 
 TaskManager.defineTask(BACKGROUND_UPDATE_TASK, async () => {
@@ -60,7 +69,7 @@ TaskManager.defineTask(BACKGROUND_UPDATE_TASK, async () => {
 export const registerBackgroundTasks = async () => {
   try {
     await BackgroundFetch.registerTaskAsync(BACKGROUND_UPDATE_TASK, {
-      minimumInterval: 60 * 60, // 1 hour
+      minimumInterval: 10 * 60, // 10 minutes
       stopOnTerminate: false,
       startOnBoot: true,
     });

@@ -12,16 +12,16 @@ export const GlassCard = ({ children, style, intensity = 40, tint = 'dark' }) =>
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 28,
-    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    padding: 16,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.05,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 5,
   },
 });
