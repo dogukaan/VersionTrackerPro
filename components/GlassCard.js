@@ -2,9 +2,14 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 
-export const GlassCard = ({ children, style, intensity = 40, tint = 'dark' }) => {
+export const GlassCard = ({ children, style, intensity = 40, isDarkMode = false }) => {
+  const tint = isDarkMode ? 'dark' : 'light';
+  const customBg = isDarkMode 
+    ? { backgroundColor: 'rgba(28, 28, 30, 0.7)' } 
+    : { backgroundColor: 'rgba(255, 255, 255, 0.85)' };
+
   return (
-    <BlurView intensity={intensity} tint={tint} style={[styles.card, style]}>
+    <BlurView intensity={intensity} tint={tint} style={[styles.card, customBg, style]}>
       {children}
     </BlurView>
   );

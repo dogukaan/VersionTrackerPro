@@ -31,7 +31,10 @@ import {
   Search,
   Key,
   Download,
-  Info
+  Info,
+  Sun,
+  Moon,
+  Box
 } from 'lucide-react-native';
 
 // Services & Components
@@ -65,6 +68,21 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [cachedApks, setCachedApks] = useState({}); // { fileName: true }
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Theme Config
+  const theme = {
+    bg: isDarkMode ? '#000000' : '#F2F2F7',
+    card: isDarkMode ? 'rgba(28, 28, 30, 0.7)' : 'rgba(255, 255, 255, 0.95)',
+    text: isDarkMode ? '#FFFFFF' : '#000000',
+    subText: isDarkMode ? '#8E8E93' : '#636366',
+    accent: '#007AFF', // iOS Blue
+    accentBg: isDarkMode ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 122, 255, 0.1)',
+    danger: '#FF3B30',
+    success: '#34C759',
+    iconBg: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    border: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+  };
 
   // Form State
   const [newRepoPath, setNewRepoPath] = useState('');
@@ -215,24 +233,24 @@ export default function App() {
   // Renderers
   const renderRepoItem = ({ item }) => (
     <TouchableOpacity onPress={() => handleSelectRepo(item)} activeOpacity={0.7}>
-      <GlassCard style={styles.repoCard}>
+      <GlassCard isDarkMode={isDarkMode} style={[styles.repoCard, { backgroundColor: theme.card }]}>
         <View style={styles.repoInfo}>
-          <View style={styles.repoIconContainer}>
-            <Github color="#fff" size={24} />
+          <View style={[styles.repoIconContainer, { backgroundColor: theme.iconBg }]}>
+            <Github color={theme.text} size={24} />
           </View>
           <View style={styles.repoTextGroup}>
-            <Text style={styles.repoName}>{item.name}</Text>
-            <Text style={styles.repoOwner}>{item.owner}</Text>
+            <Text style={[styles.repoName, { color: theme.text }]}>{item.name}</Text>
+            <Text style={[styles.repoOwner, { color: theme.subText }]}>{item.owner}</Text>
           </View>
         </View>
         <View style={styles.repoStatus}>
           {item.lastVersion && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{item.lastVersion}</Text>
+            <View style={[styles.badge, { backgroundColor: theme.accentBg }]}>
+              <Text style={[styles.badgeText, { color: theme.accent }]}>{item.lastVersion}</Text>
             </View>
           )}
-          <TouchableOpacity onPress={() => handleDeleteRepo(item.id)} style={styles.deleteAction}>
-            <Trash2 size={18} color="rgba(255,255,255,0.4)" />
+          <TouchableOpacity onPress={() => handleDeleteRepo(item.id)} style={[styles.deleteAction, { backgroundColor: theme.iconBg }]}>
+            <Trash2 size={18} color={theme.subText} />
           </TouchableOpacity>
         </View>
       </GlassCard>
@@ -241,42 +259,48 @@ export default function App() {
 
   const renderReleaseItem = ({ item }) => {
     if (!item) return null;
+    const isDownloaded = cachedApks[item.apkAsset?.name];
+    const isDownloading = downloadingId === item.id;
+
     return (
-      <TouchableOpacity onPress={() => setSelectedVersion(item)} activeOpacity={0.8}>
-        <GlassCard style={styles.releaseCard}>
+      <TouchableOpacity onPress={() => { setSelectedVersion(item); setModalVisible(true); }} activeOpacity={0.8}>
+        <GlassCard isDarkMode={isDarkMode} style={[styles.releaseCard, { backgroundColor: theme.card }]}>
           <View style={styles.releaseLeft}>
-            <Text style={styles.versionLabel}>{item.version || 'Bilinmiyor'}</Text>
-            <Text style={styles.releaseDate}>
+            <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version || 'Bilinmiyor'}</Text>
+            <Text style={[styles.releaseDate, { color: theme.subText }]}>
               {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : ''}
-              {cachedApks[item.apkAsset?.name] && <Text style={{ color: '#34C759', fontWeight: '800' }}> • İNDİRİLDİ</Text>}
+              {isDownloaded && <Text style={{ color: theme.success, fontWeight: '900' }}> • İNDİRİLDİ</Text>}
             </Text>
           </View>
           <View style={styles.releaseRight}>
-            {downloadingId === item.id ? (
-              <View style={styles.downloadProgressContainer}>
-                <ActivityIndicator size="small" color="#34C759" />
-                <Text style={styles.progressText}>%{Math.round(progress * 100)}</Text>
+            {isDownloading ? (
+              <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg }]}>
+                <ActivityIndicator size="small" color={theme.accent} />
+                <Text style={[styles.progressText, { color: theme.accent }]}>%{Math.round(progress * 100)}</Text>
               </View>
             ) : (
               <View style={styles.actionButtonGroup}>
                 <TouchableOpacity 
-                  style={[styles.actionButton, styles.downloadButton, cachedApks[item.apkAsset?.name] && { backgroundColor: '#007AFF' }]}
+                  style={[
+                    styles.actionButton, 
+                    isDownloaded ? { backgroundColor: theme.accent } : { backgroundColor: theme.success }
+                  ]}
                   onPress={() => handleInstall(item, selectedRepo?.token)}
                 >
-                  {cachedApks[item.apkAsset?.name] ? (
+                  {isDownloaded ? (
                     <Box size={20} color="#fff" />
                   ) : (
                     <Download size={20} color="#fff" />
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.actionButton, styles.detailButton]}
+                  style={[styles.actionButton, styles.detailButton, { backgroundColor: theme.iconBg }]}
                   onPress={() => {
                     setSelectedVersion(item);
                     setModalVisible(true);
                   }}
                 >
-                  <Info size={22} color="#007AFF" />
+                  <Info size={22} color={theme.accent} />
                 </TouchableOpacity>
               </View>
             )}
@@ -288,34 +312,48 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={styles.mainContainer}>
-        <StatusBar style="light" />
+      <View style={[styles.mainContainer, { backgroundColor: theme.bg }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         
         {/* Background Accents */}
-        <View style={[styles.glow, styles.glow1]} />
-        <View style={[styles.glow, styles.glow2]} />
+        <View style={[styles.glow, styles.glow1, { backgroundColor: theme.accentBg }]} />
+        <View style={[styles.glow, styles.glow2, { backgroundColor: isDarkMode ? 'rgba(52, 199, 89, 0.1)' : 'rgba(52, 199, 89, 0.05)' }]} />
         
         <SafeAreaView style={styles.safeArea}>
           
           {/* Header */}
           <View style={styles.header}>
-            {currentScreen === 'detail' ? (
-              <TouchableOpacity onPress={navigateBack} style={styles.backButton}>
-                <ArrowLeft color="#333" size={24} />
+            <View style={styles.headerLeft}>
+              {currentScreen === 'detail' ? (
+                <TouchableOpacity onPress={navigateBack} style={[styles.backButton, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <ArrowLeft color={theme.text} size={24} />
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.headerIcon, { backgroundColor: theme.iconBg, borderColor: theme.border }]}>
+                  <Github color={theme.text} size={32} />
+                </View>
+              )}
+            </View>
+
+            <View style={styles.headerCenter}>
+              <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
+                {currentScreen === 'home' ? 'Versiyonlar' : selectedRepo?.name}
+              </Text>
+            </View>
+
+            <View style={styles.headerRight}>
+              <TouchableOpacity 
+                style={[styles.themeToggle, { backgroundColor: theme.iconBg }]} 
+                onPress={() => setIsDarkMode(!isDarkMode)}
+              >
+                {isDarkMode ? <Sun color={theme.accent} size={22} /> : <Moon color={theme.accent} size={22} />}
               </TouchableOpacity>
-            ) : (
-              <View style={styles.headerIcon}>
-                <Github color="#000" size={32} />
-              </View>
-            )}
-            <Text style={styles.title}>
-              {currentScreen === 'home' ? 'Versiyonlar' : selectedRepo?.name}
-            </Text>
-            {currentScreen === 'home' && (
-              <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)}>
-                <Plus color="#fff" size={24} />
-              </TouchableOpacity>
-            )}
+              {currentScreen === 'home' && (
+                <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.text }]} onPress={() => setShowAddModal(true)}>
+                  <Plus color={theme.bg} size={24} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Screen Content */}
@@ -413,6 +451,7 @@ export default function App() {
         <VersionModal 
           visible={modalVisible}
           version={selectedVersion}
+          isDarkMode={isDarkMode}
           onClose={() => {
             setModalVisible(false);
             setSelectedVersion(null);
@@ -455,29 +494,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 28,
-    paddingTop: 24,
-    paddingBottom: 32,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
   },
-  headerIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  headerLeft: {
+    width: 60,
+    alignItems: 'flex-start',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerRight: {
+    width: 110,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  themeToggle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  headerIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
   backButton: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#eee',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -485,39 +542,39 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: -1.5,
+    letterSpacing: -1,
+    textAlign: 'center',
   },
   addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: '#000',
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowRadius: 15,
+    elevation: 8,
   },
   content: {
     flex: 1,
   },
   listPadding: {
-    paddingHorizontal: 24,
-    paddingBottom: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   repoCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    padding: 22,
-    backgroundColor: '#fff',
+    marginBottom: 16,
+    padding: 20,
     borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   repoInfo: {
     flexDirection: 'row',
@@ -525,27 +582,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   repoIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: '#F2F2F7',
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 18,
+    marginRight: 16,
   },
   repoTextGroup: {
     flex: 1,
   },
   repoName: {
-    color: '#000',
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '800',
-    letterSpacing: -0.8,
+    letterSpacing: -0.5,
   },
   repoOwner: {
-    color: '#8E8E93',
-    fontSize: 15,
-    marginTop: 4,
+    fontSize: 14,
+    marginTop: 2,
     fontWeight: '500',
   },
   repoStatus: {
@@ -553,22 +607,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badge: {
-    backgroundColor: '#007AFF20',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginRight: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 10,
   },
   badgeText: {
-    color: '#007AFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   deleteAction: {
-    padding: 10,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
+    padding: 8,
+    borderRadius: 10,
   },
   emptyState: {
     flex: 1,
@@ -577,40 +628,37 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   emptyTitle: {
-    color: '#000',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
-    marginBottom: 12,
-    letterSpacing: -1,
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   emptyDesc: {
-    color: '#8E8E93',
-    fontSize: 17,
+    fontSize: 16,
     textAlign: 'center',
-    maxWidth: '80%',
-    lineHeight: 26,
+    maxWidth: '75%',
+    lineHeight: 24,
     fontWeight: '500',
   },
   releaseCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 22,
-    backgroundColor: '#fff',
+    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   versionLabel: {
-    color: '#000',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: -1,
+    letterSpacing: -0.5,
   },
   releaseDate: {
-    color: '#8E8E93',
-    fontSize: 14,
-    marginTop: 4,
+    fontSize: 13,
+    marginTop: 2,
     fontWeight: '600',
   },
   actionButtonGroup: {
@@ -618,32 +666,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailButton: {
-    backgroundColor: '#F2F2F7',
     marginLeft: 8,
-  },
-  downloadButton: {
-    backgroundColor: '#34C759',
   },
   downloadProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#34C75920',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
   progressText: {
-    color: '#34C759',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
-    marginLeft: 10,
+    marginLeft: 8,
   },
   footer: {
     paddingVertical: 24,

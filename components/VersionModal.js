@@ -6,10 +6,19 @@ import { fetchFileContent, fetchCommits } from '../services/githubService';
 
 import MarkdownRenderer from './MarkdownRenderer';
 
-export const VersionModal = ({ visible, version, onClose, onInstall, downloading, token }) => {
+export const VersionModal = ({ visible, version, onClose, onInstall, downloading, token, isDarkMode }) => {
   const [fullNotes, setFullNotes] = useState('');
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const themeByMode = {
+    bg: isDarkMode ? '#000000' : '#FFFFFF',
+    text: isDarkMode ? '#FFFFFF' : '#000000',
+    subText: isDarkMode ? '#8E8E93' : '#636366',
+    accent: '#007AFF',
+    iconBg: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    border: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+  };
 
   useEffect(() => {
     if (visible && version) {
@@ -55,22 +64,22 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
       onRequestClose={onClose}
     >
       <View style={styles.centeredView}>
-        <View style={[styles.modalBlur, { backgroundColor: '#fff' }]}>
+        <View style={[styles.modalBlur, { backgroundColor: themeByMode.bg, borderColor: themeByMode.border }]}>
           <View style={styles.modalView}>
             <View style={styles.header}>
               <View style={styles.titleGroup}>
-                <Text style={styles.versionTag}>{version.version}</Text>
-                <Text style={styles.releaseName}>{version.name}</Text>
+                <Text style={[styles.versionTag, { color: themeByMode.text }]}>{version.version}</Text>
+                <Text style={[styles.releaseName, { color: themeByMode.subText }]}>{version.name}</Text>
               </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <X color="#333" size={24} />
+              <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: themeByMode.iconBg }]}>
+                <X color={themeByMode.text} size={24} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
               <View style={styles.changelogHeader}>
-                <FileText size={16} color="rgba(255,255,255,0.5)" />
-                <Text style={styles.changelogTitle}>DEĞİŞİKLİK GÜNLÜĞÜ</Text>
+                <FileText size={16} color={themeByMode.subText} />
+                <Text style={[styles.changelogTitle, { color: themeByMode.subText }]}>DEĞİŞİKLİK GÜNLÜĞÜ</Text>
               </View>
               
               {loading ? (
@@ -81,7 +90,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
               ) : (
                 <>
                   {fullNotes ? (
-                    <MarkdownRenderer style={markdownStyles}>
+                    <MarkdownRenderer style={getMarkdownStyles(isDarkMode)}>
                       {fullNotes}
                     </MarkdownRenderer>
                   ) : null}
@@ -89,27 +98,27 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
                   {commits.length > 0 && (
                     <View style={styles.commitsContainer}>
                       <View style={[styles.changelogHeader, { marginTop: 20 }]}>
-                        <GitCommit size={16} color="rgba(255,255,255,0.5)" />
-                        <Text style={styles.changelogTitle}>SON DEĞİŞİKLİKLER (COMMITS)</Text>
+                        <GitCommit size={16} color={themeByMode.subText} />
+                        <Text style={[styles.changelogTitle, { color: themeByMode.subText }]}>SON DEĞİŞİKLİKLER (COMMITS)</Text>
                       </View>
                       {commits.map((commit, index) => (
                         <View key={index} style={styles.commitItem}>
                           <View style={styles.commitDot} />
                           <View style={styles.commitContent}>
-                            <Text style={styles.commitMessage} numberOfLines={2}>
+                            <Text style={[styles.commitMessage, { color: themeByMode.text }]} numberOfLines={2}>
                               {commit.message}
                             </Text>
                             <View style={styles.commitMeta}>
-                              <View style={styles.metaBadge}>
-                                <User size={10} color="#888" />
-                                <Text style={styles.metaText}>{commit.author}</Text>
+                              <View style={[styles.metaBadge, { backgroundColor: themeByMode.iconBg }]}>
+                                <User size={10} color={themeByMode.subText} />
+                                <Text style={[styles.metaText, { color: themeByMode.subText }]}>{commit.author}</Text>
                               </View>
-                              <View style={styles.metaBadge}>
-                                <Clock size={10} color="#888" />
-                                <Text style={styles.metaText}>{commit.date ? new Date(commit.date).toLocaleDateString('tr-TR') : 'Tarih Yok'}</Text>
+                              <View style={[styles.metaBadge, { backgroundColor: themeByMode.iconBg }]}>
+                                <Clock size={10} color={themeByMode.subText} />
+                                <Text style={[styles.metaText, { color: themeByMode.subText }]}>{commit.date ? new Date(commit.date).toLocaleDateString('tr-TR') : 'Tarih Yok'}</Text>
                               </View>
-                              <View style={styles.metaBadge}>
-                                <Text style={[styles.metaText, { color: '#007AFF', fontFamily: 'monospace' }]}>{commit.sha}</Text>
+                              <View style={[styles.metaBadge, { backgroundColor: themeByMode.iconBg }]}>
+                                <Text style={[styles.metaText, { color: themeByMode.accent, fontFamily: 'monospace' }]}>{commit.sha}</Text>
                               </View>
                             </View>
                           </View>
@@ -119,16 +128,16 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
                   )}
                   
                   {!fullNotes && commits.length === 0 && (
-                    <Text style={styles.changelogText}>Bu sürüm için detaylı not veya commit bulunamadı.</Text>
+                    <Text style={[styles.changelogText, { color: themeByMode.text }]}>Bu sürüm için detaylı not veya commit bulunamadı.</Text>
                   )}
                 </>
               )}
             </ScrollView>
 
-            <View style={styles.footer}>
-              <View style={styles.infoRow}>
-                <Box size={16} color="#888" />
-                <Text style={styles.infoText}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
+            <View style={[styles.footer, { borderTopColor: themeByMode.border }]}>
+              <View style={[styles.infoRow, { backgroundColor: themeByMode.iconBg }]}>
+                <Box size={16} color={themeByMode.subText} />
+                <Text style={[styles.infoText, { color: themeByMode.subText }]}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
               </View>
               
               <TouchableOpacity 
@@ -153,19 +162,19 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
   );
 };
 
-const markdownStyles = {
+const getMarkdownStyles = (isDarkMode) => ({
   body: {
-    color: '#000',
+    color: isDarkMode ? '#FFFFFF' : '#000000',
     fontSize: 16,
     lineHeight: 24,
   },
   heading1: { color: '#007AFF', fontWeight: '900', marginVertical: 10 },
-  heading2: { color: '#000', fontWeight: '800', marginVertical: 8 },
+  heading2: { color: isDarkMode ? '#FFFFFF' : '#000000', fontWeight: '800', marginVertical: 8 },
   link: { color: '#007AFF', textDecorationLine: 'underline' },
-  strong: { fontWeight: '800', color: '#000' },
-  bullet_list: { color: '#000' },
-  list_item: { color: '#000', marginVertical: 4 },
-};
+  strong: { fontWeight: '800', color: isDarkMode ? '#FFFFFF' : '#000000' },
+  bullet_list: { color: isDarkMode ? '#FFFFFF' : '#000000' },
+  list_item: { color: isDarkMode ? '#FFFFFF' : '#000000', marginVertical: 4 },
+});
 
 const styles = StyleSheet.create({
   centeredView: {
@@ -200,13 +209,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   versionTag: {
-    color: '#000',
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: -1.5,
   },
   releaseName: {
-    color: '#8E8E93',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 4,
@@ -238,7 +245,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   changelogText: {
-    color: '#000',
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '400',
@@ -270,7 +276,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   infoText: {
-    color: '#8E8E93',
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
@@ -316,7 +321,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   commitMessage: {
-    color: '#1C1C1E',
     fontSize: 15,
     fontWeight: '600',
     lineHeight: 20,
@@ -337,7 +341,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    color: '#8E8E93',
     fontSize: 11,
     fontWeight: '700',
   },

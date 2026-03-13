@@ -22,7 +22,7 @@ export const fetchReleases = async (repoOwner, repoName, token = null) => {
     const data = await response.json();
     
     // Filter for releases that have APK assets
-    return data.map(release => {
+    const releasesWithApk = data.map(release => {
       const apkAsset = release.assets.find(asset => asset.name.endsWith('.apk'));
       if (!apkAsset) return null;
 
@@ -41,6 +41,20 @@ export const fetchReleases = async (repoOwner, repoName, token = null) => {
         }
       };
     }).filter(release => release !== null);
+
+    // Sort releases by version number (semver-like) descending
+    return releasesWithApk.sort((a, b) => {
+      const parseVersion = (v) => v.replace(/[^0-9.]/g, '').split('.').map(Number);
+      const vA = parseVersion(a.version);
+      const vB = parseVersion(b.version);
+      
+      for (let i = 0; i < Math.max(vA.length, vB.length); i++) {
+        const numA = vA[i] || 0;
+        const numB = vB[i] || 0;
+        if (numA !== numB) return numB - numA;
+      }
+      return 0;
+    });
   } catch (error) {
     console.error('Error fetching releases:', error);
     throw error;
