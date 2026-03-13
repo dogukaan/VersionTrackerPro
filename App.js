@@ -115,7 +115,9 @@ export default function App() {
     const status = {};
     for (const rel of releases) {
       if (rel.apkAsset) {
-        status[rel.apkAsset.name] = await isApkDownloaded(rel.apkAsset.name);
+        // Use version-prefixed name for unique caching
+        const uniqueName = `${rel.version}_${rel.apkAsset.name}`;
+        status[rel.apkAsset.name] = await isApkDownloaded(uniqueName);
       }
     }
     setCachedApks(status);
@@ -208,9 +210,11 @@ export default function App() {
 
     try {
       const downloadUrl = (token && asset.apiUrl) ? asset.apiUrl : asset.downloadUrl;
+      const uniqueName = `${version.version}_${asset.name}`;
+      
       await downloadAndInstallApk(
         downloadUrl,
-        asset.name,
+        uniqueName,
         (p) => setProgress(p),
         token
       );
