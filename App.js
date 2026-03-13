@@ -174,7 +174,7 @@ export default function App() {
         token
       );
     } catch (err) {
-      Alert.alert('Hata', 'İndirme veya kurulum başarısız oldu.');
+      Alert.alert('Hata', err.message || 'İndirme veya kurulum başarısız oldu.');
     } finally {
       setDownloadingId(null);
       setProgress(0);

@@ -1,11 +1,10 @@
-import React from 'react';
-import Markdown from 'react-native-markdown-display';
+import { Text } from 'react-native';
 
 const MarkdownRenderer = ({ children, style }) => {
   return (
-    <Markdown style={style}>
+    <Text style={style?.body || { color: '#fff' }}>
       {children}
-    </Markdown>
+    </Text>
   );
 };
 

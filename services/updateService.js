@@ -84,35 +84,54 @@ export const downloadAndInstallApk = async (apkUrl, fileName, onProgress, token 
   }
 
   try {
-    const downloadDest = `${FileSystem.cacheDirectory}${fileName}`;
+    const downloadDest = `${FileSystem.documentDirectory}${fileName}`;
     
     // For the actual download, only send headers if we are still hitting GitHub API
     const downloadHeaders = finalUrl.includes('api.github.com') ? headers : {};
 
+    console.log(`[UpdateService] Downloading to: ${downloadDest}`);
     const downloadResumable = FileSystem.createDownloadResumable(
       finalUrl,
       downloadDest,
-      downloadHeaders,
+      { headers: downloadHeaders },
       (downloadProgress) => {
         const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
         if (onProgress) onProgress(progress);
       }
     );
 
-    const { uri } = await downloadResumable.downloadAsync();
+    const result = await downloadResumable.downloadAsync();
+    if (!result || !result.uri) throw new Error('Dosya indirilemedi (Stream hatası)');
+    const uri = result.uri;
     
     if (Platform.OS === 'android') {
-      const contentUri = await FileSystem.getContentUriAsync(uri);
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-        data: contentUri,
-        flags: 1,
-        type: 'application/vnd.android.package-archive'
-      });
+      try {
+        console.log('[UpdateService] Launching Android Installer...');
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1,
+          type: 'application/vnd.android.package-archive'
+        });
+      } catch (intentErr) {
+        console.error('[UpdateService] Intent failed, using Sharing fallback:', intentErr);
+        if (await Sharing.isAvailableAsync()) {
+          Alert.alert(
+            'Yükleme Başlatılamadı', 
+            'Otomatik yükleme başlatılamadı. Lütfen dosyayı "Kaydet" veya "Dosyalarım ile aç" seçeneğiyle yükleyin.',
+            [{ text: 'Tamam', onPress: () => Sharing.shareAsync(uri) }]
+          );
+        } else {
+          throw new Error('Yükleyici başlatılamadı ve paylaşım desteklenmiyor.');
+        }
+      }
     } else {
       await Sharing.shareAsync(uri);
     }
   } catch (error) {
-    console.error('[UpdateService] Mobile download error:', error);
-    throw error;
+    console.error('[UpdateService] Mobile error:', error);
+    let errorMsg = error.message;
+    if (errorMsg.includes('Network request failed')) errorMsg = 'Bağlantı hatası: İnternetinizi kontrol edin.';
+    throw new Error(errorMsg);
   }
 };
