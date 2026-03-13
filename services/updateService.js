@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 import { Platform, Alert } from 'react-native';
 
 export const isApkDownloaded = async (fileName) => {
@@ -8,6 +9,21 @@ export const isApkDownloaded = async (fileName) => {
     const info = await FileSystem.getInfoAsync(`${FileSystem.documentDirectory}${fileName}`);
     return info.exists;
   } catch (e) {
+    return false;
+  }
+};
+
+export const deleteApk = async (fileName) => {
+  try {
+    const path = `${FileSystem.documentDirectory}${fileName}`;
+    const info = await FileSystem.getInfoAsync(path);
+    if (info.exists) {
+      await FileSystem.deleteAsync(path, { idempotent: true });
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('[UpdateService] Delete error:', e);
     return false;
   }
 };
@@ -66,18 +82,55 @@ export const downloadAndInstallApk = async (apkUrl, fileName, onProgress, token 
     // For the actual download, only send headers if we are still hitting GitHub API
     const downloadHeaders = finalUrl.includes('api.github.com') ? headers : {};
 
+    // Pre-clean for fresh download (Fixes Parse Error)
+    if (fileInfo.exists) {
+      await FileSystem.deleteAsync(downloadDest);
+    }
+
     console.log(`[UpdateService] Downloading to: ${downloadDest}`);
+    
+    // Create progress notification
+    const notificationId = `download-${fileName}`;
+    let lastProgress = 0;
+
     const downloadResumable = FileSystem.createDownloadResumable(
       finalUrl,
       downloadDest,
       { headers: downloadHeaders },
-      (downloadProgress) => {
+      async (downloadProgress) => {
         const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
         if (onProgress) onProgress(progress);
+
+        // Update notification every 5% to avoid spamming
+        if (progress - lastProgress > 0.05 || progress === 1) {
+          lastProgress = progress;
+          await Notifications.setNotificationHandler({
+            handleNotification: async () => ({
+              shouldShowAlert: false,
+              shouldPlaySound: false,
+              shouldSetBadge: false,
+            }),
+          });
+          
+          await Notifications.scheduleNotificationAsync({
+            identifier: notificationId,
+            content: {
+              title: `${fileName} İndiriliyor`,
+              body: `İlerleme: %${Math.round(progress * 100)}`,
+              sticky: true,
+              color: '#007AFF',
+            },
+            trigger: null,
+          });
+        }
       }
     );
 
     const result = await downloadResumable.downloadAsync();
+    
+    // Clear notification on finish
+    await Notifications.dismissNotificationAsync(notificationId);
+
     if (!result || !result.uri) throw new Error('Dosya indirilemedi (Stream hatası)');
     
     await launchInstaller(result.uri);

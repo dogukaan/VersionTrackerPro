@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 // expo-blur removed for Android stability
-import { X, Download, Box, FileText, GitCommit, Clock, User, Calendar } from 'lucide-react-native';
+import { X, Download, Box, FileText, GitCommit, Clock, User, Trash2 } from 'lucide-react-native';
 import { fetchFileContent, fetchCommits } from '../services/githubService';
 
 import MarkdownRenderer from './MarkdownRenderer';
 
-export const VersionModal = ({ visible, version, onClose, onInstall, downloading, token, isDarkMode }) => {
+export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk, downloaded, downloading, token, isDarkMode }) => {
   const [fullNotes, setFullNotes] = useState('');
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -90,7 +90,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
               ) : (
                 <>
                   {fullNotes ? (
-                    <MarkdownRenderer style={getMarkdownStyles(isDarkMode)}>
+                    <MarkdownRenderer isDarkMode={isDarkMode}>
                       {fullNotes}
                     </MarkdownRenderer>
                   ) : null}
@@ -140,20 +140,31 @@ export const VersionModal = ({ visible, version, onClose, onInstall, downloading
                 <Text style={[styles.infoText, { color: themeByMode.subText }]}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
               </View>
               
-              <TouchableOpacity 
-                style={[styles.installButton, downloading && styles.disabledButton]}
-                onPress={() => onInstall(version)}
-                disabled={downloading}
-              >
-                {downloading ? (
-                  <Text style={styles.installButtonText}>İndiriliyor...</Text>
-                ) : (
-                  <>
-                    <Download size={20} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={styles.installButtonText}>Yükle</Text>
-                  </>
+              <View style={styles.footerActions}>
+                {downloaded && !downloading && (
+                  <TouchableOpacity 
+                    style={[styles.deleteButton, { borderRightWidth: 1, borderRightColor: themeByMode.border }]}
+                    onPress={() => onDeleteApk(version)}
+                  >
+                    <Trash2 size={20} color="#FF3B30" />
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.installButton, downloading && styles.disabledButton]}
+                  onPress={() => onInstall(version)}
+                  disabled={downloading}
+                >
+                  {downloading ? (
+                    <Text style={styles.installButtonText}>İndiriliyor...</Text>
+                  ) : (
+                    <>
+                      <Download size={20} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={styles.installButtonText}>{downloaded ? 'Yükle' : 'İndir'}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -301,6 +312,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 17,
     letterSpacing: -0.5,
+  },
+  footerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deleteButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: '#FF3B3015',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   commitsContainer: {
     paddingBottom: 10,

@@ -1,5 +1,5 @@
 import 'punycode';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -15,8 +15,14 @@ import {
   LayoutAnimation,
   UIManager,
   RefreshControl,
-  BackHandler
+  BackHandler,
+  Animated
 } from 'react-native';
+import { 
+  GestureHandlerRootView, 
+  Swipeable,
+  RectButton
+} from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -42,13 +48,12 @@ import {
 // Services & Components
 import { storageService } from './services/storageService';
 import { fetchReleases, fetchWorkflowRuns } from './services/githubService';
-import { downloadAndInstallApk } from './services/updateService';
+import { downloadAndInstallApk, isApkDownloaded, deleteApk } from './services/updateService';
 import { registerBackgroundTasks } from './services/backgroundService';
 import { sendLocalNotification, requestNotificationPermissions } from './services/notificationService';
 import * as Notifications from 'expo-notifications';
 import { GlassCard } from './components/GlassCard';
 import { VersionModal } from './components/VersionModal';
-import { isApkDownloaded } from './services/updateService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -336,6 +341,15 @@ export default function App() {
     }
   };
 
+  const handleDeleteApk = async (item) => {
+    if (!item.apkAsset) return;
+    const uniqueName = `${item.version}_${item.apkAsset.name}`;
+    const deleted = await deleteApk(uniqueName);
+    if (deleted) {
+      checkLocalFiles();
+    }
+  };
+
   const navigateBack = () => {
     setCurrentScreen('home');
     setReleases([]);
@@ -398,72 +412,114 @@ export default function App() {
       )
     );
     
-    // If no asset yet but a build is running, show Building
     const isBuilding = !item.apkAsset && activeRun;
 
+    const renderRightActions = (progressAnimatedValue, dragAnimatedValue) => {
+      const trans = dragAnimatedValue.interpolate({
+        inputRange: [-80, 0],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+      });
+      return (
+        <RectButton 
+          style={[styles.rightAction, { backgroundColor: theme.danger }]} 
+          onPress={() => item.apkAsset ? handleDeleteApk(item) : Alert.alert('Mesaj', 'Bu sürüm için silinecek dosya yok.')}
+        >
+          <Animated.View style={{ transform: [{ scale: trans }] }}>
+            <Trash2 size={24} color="#fff" />
+          </Animated.View>
+        </RectButton>
+      );
+    };
+
+    // Pulse animation for Building state
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    
+    useEffect(() => {
+      if (isBuilding) {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
+            Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+          ])
+        ).start();
+      } else {
+        pulseAnim.setValue(1);
+      }
+    }, [isBuilding]);
+
     return (
-      <TouchableOpacity onPress={() => { setSelectedVersion(item); setModalVisible(true); }} activeOpacity={0.8}>
-        <GlassCard isDarkMode={isDarkMode} style={[styles.releaseCard, { backgroundColor: theme.card }]}>
-          <View style={styles.releaseLeft}>
-            <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version || 'Bilinmiyor'}</Text>
-            <Text style={[styles.releaseDate, { color: theme.subText }]}>
-              {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : 'Yayınlanıyor...'}
-              {isDownloaded && <Text style={{ color: theme.success, fontWeight: '900' }}> • İNDİRİLDİ</Text>}
-              {isBuilding && <Text style={{ color: theme.accent, fontWeight: '900' }}> • BUILD EDİLİYOR</Text>}
-            </Text>
-          </View>
-          <View style={styles.releaseRight}>
-            {isDownloading ? (
-              <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg }]}>
-                <ActivityIndicator size="small" color={theme.accent} />
-                <Text style={[styles.progressText, { color: theme.accent }]}>%{Math.round(progress * 100)}</Text>
+      <Swipeable
+        renderRightActions={renderRightActions}
+        friction={2}
+        rightThreshold={40}
+      >
+        <TouchableOpacity onPress={() => { setSelectedVersion(item); setModalVisible(true); }} activeOpacity={0.8}>
+          <GlassCard isDarkMode={isDarkMode} style={[styles.releaseCard, { backgroundColor: theme.card, borderLeftWidth: isBuilding ? 4 : 1, borderLeftColor: isBuilding ? theme.accent : theme.border }]}>
+            <Animated.View style={[styles.releaseContainer, isBuilding && { transform: [{ scale: pulseAnim }] }]}>
+              <View style={styles.releaseLeft}>
+                <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version || 'Bilinmiyor'}</Text>
+                <Text style={[styles.releaseDate, { color: theme.subText }]}>
+                  {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : 'Yayınlanıyor...'}
+                  {isDownloaded && <Text style={{ color: theme.success, fontWeight: '900' }}> • İNDİRİLDİ</Text>}
+                  {isBuilding && <Text style={{ color: theme.accent, fontWeight: '900' }}> • DERLENİYOR</Text>}
+                </Text>
               </View>
-            ) : isBuilding ? (
-              <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg }]}>
-                <ActivityIndicator size="small" color={theme.accent} />
-                <Text style={[styles.progressText, { color: theme.accent, marginLeft: 8 }]}>Derleniyor</Text>
-              </View>
-            ) : (
-              <View style={styles.actionButtonGroup}>
-                {item.apkAsset ? (
-                  <TouchableOpacity 
-                    style={[
-                      styles.actionButton, 
-                      isDownloaded ? { backgroundColor: theme.accent } : { backgroundColor: theme.success }
-                    ]}
-                    onPress={() => handleInstall(item, selectedRepo?.token)}
-                  >
-                    {isDownloaded ? (
-                      <Box size={20} color="#fff" />
-                    ) : (
-                      <Download size={20} color="#fff" />
-                    )}
-                  </TouchableOpacity>
+              <View style={styles.releaseRight}>
+                {isDownloading ? (
+                  <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg }]}>
+                    <ActivityIndicator size="small" color={theme.accent} />
+                    <Text style={[styles.progressText, { color: theme.accent }]}>%{Math.round(progress * 100)}</Text>
+                  </View>
+                ) : isBuilding ? (
+                  <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg, borderRadius: 20 }]}>
+                    <RefreshCw size={14} color={theme.accent} style={{ marginRight: 6 }} />
+                    <Text style={[styles.progressText, { color: theme.accent }]}>Derleniyor</Text>
+                  </View>
                 ) : (
-                  <View style={[styles.actionButton, { backgroundColor: theme.iconBg }]}>
-                     <RefreshCw size={18} color={theme.subText} />
+                  <View style={styles.actionButtonGroup}>
+                    {item.apkAsset ? (
+                      <TouchableOpacity 
+                        style={[
+                          styles.actionButton, 
+                          isDownloaded ? { backgroundColor: theme.accent } : { backgroundColor: theme.success }
+                        ]}
+                        onPress={() => handleInstall(item, selectedRepo?.token)}
+                      >
+                        {isDownloaded ? (
+                          <Box size={20} color="#fff" />
+                        ) : (
+                          <Download size={20} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.actionButton, { backgroundColor: theme.iconBg }]}>
+                         <RefreshCw size={18} color={theme.subText} />
+                      </View>
+                    )}
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.detailButton, { backgroundColor: theme.iconBg }]}
+                      onPress={() => {
+                        setSelectedVersion(item);
+                        setModalVisible(true);
+                      }}
+                    >
+                      <Info size={22} color={theme.accent} />
+                    </TouchableOpacity>
                   </View>
                 )}
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.detailButton, { backgroundColor: theme.iconBg }]}
-                  onPress={() => {
-                    setSelectedVersion(item);
-                    setModalVisible(true);
-                  }}
-                >
-                  <Info size={22} color={theme.accent} />
-                </TouchableOpacity>
               </View>
-            )}
-          </View>
-        </GlassCard>
-      </TouchableOpacity>
+            </Animated.View>
+          </GlassCard>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
   return (
-    <SafeAreaProvider>
-      <View style={[styles.mainContainer, { backgroundColor: theme.bg }]}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <View style={[styles.mainContainer, { backgroundColor: theme.bg }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         
         {/* Background Accents */}
@@ -614,12 +670,14 @@ export default function App() {
             setSelectedVersion(null);
           }}
           onInstall={(v) => handleInstall(v, selectedRepo?.token)}
+          onDeleteApk={(v) => handleDeleteApk(v)}
+          downloaded={selectedVersion ? cachedApks[`${selectedVersion.version}_${selectedVersion.apkAsset?.name}`] : false}
           downloading={downloadingId === selectedVersion?.id}
           token={selectedRepo?.token}
         />
-
       </View>
     </SafeAreaProvider>
+  </GestureHandlerRootView>
   );
 }
 
@@ -855,6 +913,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 3,
+  },
+  rightAction: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    backgroundColor: '#dd2c00',
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingRight: 30,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  releaseContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
   },
   modalOverlay: {
     position: 'absolute',
