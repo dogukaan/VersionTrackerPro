@@ -54,6 +54,7 @@ import { sendLocalNotification, requestNotificationPermissions } from './service
 import * as Notifications from 'expo-notifications';
 import { GlassCard } from './components/GlassCard';
 import { VersionModal } from './components/VersionModal';
+import { ReleaseItem } from './components/ReleaseItem';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -67,6 +68,7 @@ export default function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [selectedVersion, setSelectedVersion] = useState(null);
+  const [repoToDelete, setRepoToDelete] = useState(null);
   
   // Data State
   const [repos, setRepos] = useState([]);
@@ -114,6 +116,10 @@ export default function App() {
     const backAction = () => {
       if (modalVisible) {
         setModalVisible(false);
+        return true;
+      }
+      if (repoToDelete) {
+        setRepoToDelete(null);
         return true;
       }
       if (showAddModal) {
@@ -209,11 +215,13 @@ export default function App() {
 
   // Polling for build status (every 1 minute when app is active)
   useEffect(() => {
+    if (repos.length === 0) return;
+    
     const interval = setInterval(() => {
-      if (repos.length > 0) checkAllForUpdates(repos);
+      checkAllForUpdates(repos);
     }, 60000);
     return () => clearInterval(interval);
-  }, [repos, workflowRuns]);
+  }, [repos]); // Only restart interval if repos list changes
 
   // Refresh local cache status when releases change
   useEffect(() => {
@@ -241,30 +249,25 @@ export default function App() {
     }
   };
 
-  const handleDeleteRepo = async (id) => {
-    Alert.alert(
-      'Repo Sil',
-      'Bu repoyu listenizden kaldırmak istediğinize emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        { 
-          text: 'Sil', 
-          style: 'destructive',
-          onPress: async () => {
-            const updated = await storageService.removeRepo(id);
-            setRepos(updated);
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          }
-        }
-      ]
-    );
+  const handleDeleteRepo = async (repo) => {
+    setRepoToDelete(repo);
+  };
+
+  const confirmDeleteRepo = async () => {
+    if (!repoToDelete) return;
+    const updated = await storageService.removeRepo(repoToDelete.id);
+    setRepos(updated);
+    setRepoToDelete(null);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   };
 
   const handleSelectRepo = async (repo) => {
     setSelectedRepo(repo);
     setLoading(true);
     setCurrentScreen('detail');
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (Platform.OS === 'ios' || (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental)) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     
     try {
       const runs = await fetchWorkflowRuns(repo.owner, repo.name, repo.token);
@@ -302,7 +305,11 @@ export default function App() {
         }
       }
 
-      setReleases(mergedReleases);
+      // Filter out hidden versions
+      const hiddenOnes = repo.hiddenVersions || [];
+      const finalReleases = mergedReleases.filter(rel => !hiddenOnes.includes(rel.id.toString()) && !hiddenOnes.includes(rel.version));
+
+      setReleases(finalReleases);
       
       if (releaseResults.length > 0) {
         await storageService.updateRepoVersion(repo.id, releaseResults[0].version);
@@ -350,6 +357,28 @@ export default function App() {
     }
   };
 
+  const handleHideVersion = async (version) => {
+    if (!selectedRepo || !version) return;
+    
+    try {
+      // Use version ID or tag as identifier
+      const versionId = version.id.toString();
+      const updatedRepos = await storageService.hideVersion(selectedRepo.id, versionId);
+      
+      // Update local state
+      setRepos(updatedRepos);
+      const updatedRepo = updatedRepos.find(r => r.id === selectedRepo.id);
+      setSelectedRepo(updatedRepo);
+      
+      // Filter the current releases state immediately for a snapier UI
+      setReleases(prev => prev.filter(r => r.id.toString() !== versionId));
+      
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    } catch (err) {
+      Alert.alert('Hata', 'Versiyon gizlenemedi.');
+    }
+  };
+
   const navigateBack = () => {
     setCurrentScreen('home');
     setReleases([]);
@@ -386,7 +415,7 @@ export default function App() {
               <Text style={[styles.badgeText, { color: theme.accent }]}>{item.lastVersion}</Text>
             </View>
           )}
-          <TouchableOpacity onPress={() => handleDeleteRepo(item.id)} style={[styles.deleteAction, { backgroundColor: theme.iconBg }]}>
+          <TouchableOpacity onPress={() => handleDeleteRepo(item)} style={[styles.deleteAction, { backgroundColor: theme.iconBg }]}>
             <Trash2 size={18} color={theme.subText} />
           </TouchableOpacity>
         </View>
@@ -394,127 +423,22 @@ export default function App() {
     </TouchableOpacity>
   );
 
-  const renderReleaseItem = ({ item }) => {
-    if (!item) return null;
-    const uniqueName = `${item.version}_${item.apkAsset?.name}`;
-    const isDownloaded = cachedApks[uniqueName];
-    const isDownloading = downloadingId === item.id;
-
-    // Check if there is an active build for this repo that might be this release
-    const repoRuns = workflowRuns[selectedRepo?.id] || [];
-    const activeRun = repoRuns.find(run => 
-      (run.status === 'in_progress' || run.status === 'queued') && 
-      (
-        item.version === run.head_branch || 
-        item.version === run.display_title || 
-        (run.head_sha && item.notes?.includes(run.head_sha)) ||
-        (run.head_branch && item.version.includes(run.head_branch))
-      )
-    );
-    
-    const isBuilding = !item.apkAsset && activeRun;
-
-    const renderRightActions = (progressAnimatedValue, dragAnimatedValue) => {
-      const trans = dragAnimatedValue.interpolate({
-        inputRange: [-80, 0],
-        outputRange: [1, 0],
-        extrapolate: 'clamp',
-      });
-      return (
-        <RectButton 
-          style={[styles.rightAction, { backgroundColor: theme.danger }]} 
-          onPress={() => item.apkAsset ? handleDeleteApk(item) : Alert.alert('Mesaj', 'Bu sürüm için silinecek dosya yok.')}
-        >
-          <Animated.View style={{ transform: [{ scale: trans }] }}>
-            <Trash2 size={24} color="#fff" />
-          </Animated.View>
-        </RectButton>
-      );
-    };
-
-    // Pulse animation for Building state
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    
-    useEffect(() => {
-      if (isBuilding) {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
-            Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-          ])
-        ).start();
-      } else {
-        pulseAnim.setValue(1);
-      }
-    }, [isBuilding]);
-
-    return (
-      <Swipeable
-        renderRightActions={renderRightActions}
-        friction={2}
-        rightThreshold={40}
-      >
-        <TouchableOpacity onPress={() => { setSelectedVersion(item); setModalVisible(true); }} activeOpacity={0.8}>
-          <GlassCard isDarkMode={isDarkMode} style={[styles.releaseCard, { backgroundColor: theme.card, borderLeftWidth: isBuilding ? 4 : 1, borderLeftColor: isBuilding ? theme.accent : theme.border }]}>
-            <Animated.View style={[styles.releaseContainer, isBuilding && { transform: [{ scale: pulseAnim }] }]}>
-              <View style={styles.releaseLeft}>
-                <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version || 'Bilinmiyor'}</Text>
-                <Text style={[styles.releaseDate, { color: theme.subText }]}>
-                  {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : 'Yayınlanıyor...'}
-                  {isDownloaded && <Text style={{ color: theme.success, fontWeight: '900' }}> • İNDİRİLDİ</Text>}
-                  {isBuilding && <Text style={{ color: theme.accent, fontWeight: '900' }}> • DERLENİYOR</Text>}
-                </Text>
-              </View>
-              <View style={styles.releaseRight}>
-                {isDownloading ? (
-                  <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg }]}>
-                    <ActivityIndicator size="small" color={theme.accent} />
-                    <Text style={[styles.progressText, { color: theme.accent }]}>%{Math.round(progress * 100)}</Text>
-                  </View>
-                ) : isBuilding ? (
-                  <View style={[styles.downloadProgressContainer, { backgroundColor: theme.accentBg, borderRadius: 20 }]}>
-                    <RefreshCw size={14} color={theme.accent} style={{ marginRight: 6 }} />
-                    <Text style={[styles.progressText, { color: theme.accent }]}>Derleniyor</Text>
-                  </View>
-                ) : (
-                  <View style={styles.actionButtonGroup}>
-                    {item.apkAsset ? (
-                      <TouchableOpacity 
-                        style={[
-                          styles.actionButton, 
-                          isDownloaded ? { backgroundColor: theme.accent } : { backgroundColor: theme.success }
-                        ]}
-                        onPress={() => handleInstall(item, selectedRepo?.token)}
-                      >
-                        {isDownloaded ? (
-                          <Box size={20} color="#fff" />
-                        ) : (
-                          <Download size={20} color="#fff" />
-                        )}
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={[styles.actionButton, { backgroundColor: theme.iconBg }]}>
-                         <RefreshCw size={18} color={theme.subText} />
-                      </View>
-                    )}
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.detailButton, { backgroundColor: theme.iconBg }]}
-                      onPress={() => {
-                        setSelectedVersion(item);
-                        setModalVisible(true);
-                      }}
-                    >
-                      <Info size={22} color={theme.accent} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
-          </GlassCard>
-        </TouchableOpacity>
-      </Swipeable>
-    );
-  };
+  const renderReleaseItem = ({ item }) => (
+    <ReleaseItem 
+      item={item}
+      isDarkMode={isDarkMode}
+      theme={theme}
+      cachedApks={cachedApks}
+      downloadingId={downloadingId}
+      selectedRepo={selectedRepo}
+      workflowRuns={workflowRuns}
+      progress={progress}
+      handleInstall={handleInstall}
+      onHide={handleHideVersion}
+      setSelectedVersion={setSelectedVersion}
+      setModalVisible={setModalVisible}
+    />
+  );
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -671,10 +595,42 @@ export default function App() {
           }}
           onInstall={(v) => handleInstall(v, selectedRepo?.token)}
           onDeleteApk={(v) => handleDeleteApk(v)}
+          onHide={(v) => handleHideVersion(v)}
           downloaded={selectedVersion ? cachedApks[`${selectedVersion.version}_${selectedVersion.apkAsset?.name}`] : false}
           downloading={downloadingId === selectedVersion?.id}
           token={selectedRepo?.token}
         />
+        {/* Repo Delete Confirmation Modal */}
+        {repoToDelete && (
+          <View style={[styles.modalOverlay, { zIndex: 2000 }]}>
+            <BlurView intensity={30} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+            <View style={[styles.confirmDialog, { backgroundColor: theme.card, borderColor: theme.border }]}>
+               <View style={[styles.confirmIconBox, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
+                  <Trash2 size={32} color={theme.danger} />
+               </View>
+               <Text style={[styles.confirmTitle, { color: theme.text }]}>Projeyi Kaldır</Text>
+               <Text style={[styles.confirmDesc, { color: theme.subText }]}>
+                 <Text style={{ fontWeight: 'bold' }}>{repoToDelete.name}</Text> projesini listenizden kaldırmak istediğinize emin misiniz?
+               </Text>
+               
+               <View style={styles.confirmActions}>
+                  <TouchableOpacity 
+                    style={[styles.confirmBtn, { backgroundColor: theme.iconBg }]}
+                    onPress={() => setRepoToDelete(null)}
+                  >
+                    <Text style={[styles.confirmBtnText, { color: theme.text }]}>İptal</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.confirmBtn, { backgroundColor: theme.danger }]}
+                    onPress={confirmDeleteRepo}
+                  >
+                    <Text style={[styles.confirmBtnText, { color: '#fff' }]}>Evet, Sil</Text>
+                  </TouchableOpacity>
+               </View>
+            </View>
+          </View>
+        )}
       </View>
     </SafeAreaProvider>
   </GestureHandlerRootView>
@@ -870,6 +826,53 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
     letterSpacing: -0.5,
+  },
+  confirmDialog: {
+    width: '85%',
+    borderRadius: 32,
+    padding: 30,
+    alignItems: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 40,
+    elevation: 20,
+  },
+  confirmIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  confirmTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  confirmDesc: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 30,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  confirmBtnText: {
+    fontWeight: '700',
+    fontSize: 16,
   },
   releaseDate: {
     fontSize: 13,

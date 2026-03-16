@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
-// expo-blur removed for Android stability
+import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { X, Download, Box, FileText, GitCommit, Clock, User, Trash2 } from 'lucide-react-native';
 import { fetchFileContent, fetchCommits } from '../services/githubService';
 
 import MarkdownRenderer from './MarkdownRenderer';
 
-export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk, downloaded, downloading, token, isDarkMode }) => {
+const { height } = Dimensions.get('window');
+
+export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk, onHide, downloaded, downloading, token, isDarkMode }) => {
   const [fullNotes, setFullNotes] = useState('');
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const themeByMode = {
-    bg: isDarkMode ? '#000000' : '#FFFFFF',
+    bg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
     text: isDarkMode ? '#FFFFFF' : '#000000',
     subText: isDarkMode ? '#8E8E93' : '#636366',
     accent: '#007AFF',
-    iconBg: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    danger: '#FF3B30',
+    iconBg: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F2F2F7',
     border: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+    card: isDarkMode ? '#2C2C2E' : '#FFFFFF',
+    overlay: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
   };
 
   useEffect(() => {
@@ -50,9 +54,9 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
         return;
       }
     }
-    setFullNotes(version.notes || '');
     setLoading(false);
   };
+
 
   if (!version) return null;
 
@@ -64,6 +68,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
       onRequestClose={onClose}
     >
       <View style={styles.centeredView}>
+        {/* Main Content Modal */}
         <View style={[styles.modalBlur, { backgroundColor: themeByMode.bg, borderColor: themeByMode.border }]}>
           <View style={styles.modalView}>
             <View style={styles.header}>
@@ -76,7 +81,8 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            {/* Added paddingBottom to prevent hiding content behind floating card */}
+            <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
               <View style={styles.changelogHeader}>
                 <FileText size={16} color={themeByMode.subText} />
                 <Text style={[styles.changelogTitle, { color: themeByMode.subText }]}>DEĞİŞİKLİK GÜNLÜĞÜ</Text>
@@ -84,8 +90,8 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
               
               {loading ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator color="#007AFF" />
-                  <Text style={styles.loadingText}>Veriler getiriliyor...</Text>
+                  <ActivityIndicator color={themeByMode.accent} />
+                  <Text style={[styles.loadingText, { color: themeByMode.accent }]}>Veriler getiriliyor...</Text>
                 </View>
               ) : (
                 <>
@@ -103,7 +109,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
                       </View>
                       {commits.map((commit, index) => (
                         <View key={index} style={styles.commitItem}>
-                          <View style={styles.commitDot} />
+                          <View style={[styles.commitDot, { backgroundColor: themeByMode.accent }]} />
                           <View style={styles.commitContent}>
                             <Text style={[styles.commitMessage, { color: themeByMode.text }]} numberOfLines={2}>
                               {commit.message}
@@ -133,40 +139,54 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
                 </>
               )}
             </ScrollView>
+          </View>
+        </View>
 
-            <View style={[styles.footer, { borderTopColor: themeByMode.border }]}>
-              <View style={[styles.infoRow, { backgroundColor: themeByMode.iconBg }]}>
-                <Box size={16} color={themeByMode.subText} />
-                <Text style={[styles.infoText, { color: themeByMode.subText }]}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
+        {/* Floating Action Card */}
+        <View style={[styles.floatingCard, { backgroundColor: themeByMode.card, borderColor: themeByMode.border }]}>
+            {/* Left side: Commits and info */}
+            <View style={styles.floatingInfo}>
+              <View style={styles.infoRowContainer}>
+                <View style={[styles.floatingBadge, { backgroundColor: themeByMode.iconBg }]}>
+                  <GitCommit size={14} color={themeByMode.subText} />
+                  <Text style={[styles.floatingBadgeText, { color: themeByMode.subText }]}>{commits.length} Değişiklik</Text>
+                </View>
+                <View style={[styles.floatingBadge, { backgroundColor: themeByMode.iconBg }]}>
+                  <Box size={14} color={themeByMode.subText} />
+                  <Text style={[styles.floatingBadgeText, { color: themeByMode.subText }]}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
+                </View>
               </View>
-              
-              <View style={styles.footerActions}>
-                {downloaded && !downloading && (
+            </View>
+
+            {/* Right side: Actions */}
+            <View style={styles.floatingActions}>
+
+               {/* Delete Downloaded APK Button */}
+               {downloaded && !downloading && (
                   <TouchableOpacity 
-                    style={[styles.deleteButton, { borderRightWidth: 1, borderRightColor: themeByMode.border }]}
+                    style={[styles.floatingActionBtn, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}
                     onPress={() => onDeleteApk(version)}
                   >
-                    <Trash2 size={20} color="#FF3B30" />
+                    <Trash2 size={20} color={themeByMode.danger} />
                   </TouchableOpacity>
-                )}
-                
-                <TouchableOpacity 
+               )}
+
+               {/* Install / Download Button */}
+               <TouchableOpacity 
                   style={[styles.installButton, downloading && styles.disabledButton]}
                   onPress={() => onInstall(version)}
                   disabled={downloading}
                 >
                   {downloading ? (
-                    <Text style={styles.installButtonText}>İndiriliyor...</Text>
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>
-                      <Download size={20} color="#fff" style={{ marginRight: 8 }} />
+                      <Download size={20} color="#fff" style={{ marginRight: 6 }} />
                       <Text style={styles.installButtonText}>{downloaded ? 'Yükle' : 'İndir'}</Text>
                     </>
                   )}
                 </TouchableOpacity>
-              </View>
             </View>
-          </View>
         </View>
       </View>
     </Modal>
@@ -196,19 +216,20 @@ const styles = StyleSheet.create({
   },
   modalBlur: {
     width: '94%',
-    maxHeight: '85%',
+    height: '75%',
     borderRadius: 36,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#eee',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 15 },
     shadowOpacity: 0.1,
     shadowRadius: 30,
     elevation: 10,
+    marginBottom: 80,
   },
   modalView: {
     padding: 28,
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -234,13 +255,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#F2F2F7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   scrollView: {
-    maxHeight: 450,
-    marginBottom: 24,
+    flex: 1,
   },
   changelogHeader: {
     flexDirection: 'row',
@@ -248,7 +267,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   changelogTitle: {
-    color: '#8E8E93',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -265,39 +283,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#007AFF',
     marginTop: 10,
     fontSize: 14,
     fontWeight: '600',
   },
-  footer: {
+  
+  /* Floating Card Styles */
+  floatingCard: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 40 : 20,
+    width: '90%',
+    borderRadius: 24,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.15,
+    shadowRadius: 40,
+    elevation: 15,
   },
-  infoRow: {
+  floatingInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  infoRowContainer: {
+    flexDirection: 'column',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  floatingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 6,
   },
-  infoText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
+  floatingBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  floatingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  floatingActionBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   installButton: {
-    backgroundColor: '#007AFF', // Reverting to Blue for Premium Light
+    backgroundColor: '#007AFF',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 18,
-    borderRadius: 20,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    height: 48,
+    borderRadius: 16,
     shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
@@ -310,24 +358,83 @@ const styles = StyleSheet.create({
   installButtonText: {
     color: '#fff',
     fontWeight: '800',
-    fontSize: 17,
+    fontSize: 16,
     letterSpacing: -0.5,
   },
-  footerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  deleteButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    backgroundColor: '#FF3B3015',
+  
+  /* Confirmation Overlay Styles */
+  confirmationOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
+  confirmationCard: {
+    width: '85%',
+    borderRadius: 32,
+    padding: 30,
+    alignItems: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 40,
+    elevation: 20,
+  },
+  confirmIconWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  confirmTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  confirmDesc: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 30,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  confirmCancelText: {
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  confirmDeleteText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  
   commitsContainer: {
-    paddingBottom: 10,
+    paddingBottom: 20,
   },
   commitItem: {
     flexDirection: 'row',
@@ -336,10 +443,9 @@ const styles = StyleSheet.create({
   },
   commitDot: {
     width: 2,
-    backgroundColor: '#007AFF',
     marginRight: 16,
     borderRadius: 1,
-    opacity: 0.2,
+    opacity: 0.3,
   },
   commitContent: {
     flex: 1,
@@ -358,7 +464,6 @@ const styles = StyleSheet.create({
   metaBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,

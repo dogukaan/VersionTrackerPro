@@ -25,7 +25,8 @@ export const storageService = {
         name,
         token,
         lastVersion: null,
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
+        hiddenVersions: [] // Array of version IDs or tags to hide
       };
 
       const updatedRepos = [...repos, newRepo];
@@ -59,6 +60,26 @@ export const storageService = {
       return updatedRepos;
     } catch (e) {
       console.error('Error updating version', e);
+    }
+  },
+
+  async hideVersion(repoId, versionId) {
+    try {
+      const repos = await this.getRepos();
+      const updatedRepos = repos.map(r => {
+        if (r.id === repoId) {
+          const hidden = r.hiddenVersions || [];
+          if (!hidden.includes(versionId)) {
+            return { ...r, hiddenVersions: [...hidden, versionId] };
+          }
+        }
+        return r;
+      });
+      await AsyncStorage.setItem(REPOS_KEY, JSON.stringify(updatedRepos));
+      return updatedRepos;
+    } catch (e) {
+      console.error('Error hiding version', e);
+      throw e;
     }
   }
 };
