@@ -82,6 +82,12 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // Refs for background processes to avoid stale closures
+  const stateRef = useRef({ currentScreen, selectedRepo, workflowRuns });
+  useEffect(() => {
+    stateRef.current = { currentScreen, selectedRepo, workflowRuns };
+  }, [currentScreen, selectedRepo, workflowRuns]);
+
   // Theme Config
   const theme = {
     bg: isDarkMode ? '#000000' : '#F2F2F7',
@@ -165,13 +171,15 @@ export default function App() {
   };
 
   const checkAllForUpdates = async (repoList) => {
+    const { currentScreen: curScreen, selectedRepo: selRepo, workflowRuns: curWorkflowRuns } = stateRef.current;
+    
     for (const repo of repoList) {
       try {
         // Build Status Tracking
         const runs = await fetchWorkflowRuns(repo.owner, repo.name, repo.token);
         if (runs.length > 0) {
           const latestRun = runs[0];
-          const prevRuns = workflowRuns[repo.id] || [];
+          const prevRuns = curWorkflowRuns[repo.id] || [];
           const prevRun = prevRuns[0];
 
           // Notify on status change ( queued -> in_progress -> completed )
@@ -182,7 +190,7 @@ export default function App() {
             if (latestRun.conclusion === 'success') {
               body = 'Build başarıyla tamamlandı! APK indirilebilir.';
               // If we are in detail view of THIS repo, refresh releases automatically
-              if (currentScreen === 'detail' && selectedRepo?.id === repo.id) {
+              if (curScreen === 'detail' && selRepo?.id === repo.id) {
                 handleSelectRepo(repo);
               }
             } else if (latestRun.conclusion === 'failure') {

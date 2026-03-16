@@ -22,6 +22,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
     border: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
     card: isDarkMode ? '#2C2C2E' : '#FFFFFF',
     overlay: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+    success: '#34C759',
   };
 
   useEffect(() => {
@@ -155,6 +156,12 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
                   <Box size={14} color={themeByMode.subText} />
                   <Text style={[styles.floatingBadgeText, { color: themeByMode.subText }]}>{version.apkAsset?.size ? `${Math.round(version.apkAsset.size / 1024 / 1024)} MB` : 'Bilinmiyor'}</Text>
                 </View>
+                {downloaded && (
+                  <View style={[styles.floatingBadge, { backgroundColor: 'rgba(52, 199, 89, 0.1)' }]}>
+                    <Box size={14} color={themeByMode.success} />
+                    <Text style={[styles.floatingBadgeText, { color: themeByMode.success }]}>İNDİRİLDİ</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -308,6 +315,7 @@ const styles = StyleSheet.create({
   floatingInfo: {
     flex: 1,
     justifyContent: 'center',
+    paddingRight: 10,
   },
   infoRowContainer: {
     flexDirection: 'column',
@@ -321,6 +329,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     gap: 6,
+    maxWidth: 100,
   },
   floatingBadgeText: {
     fontSize: 12,

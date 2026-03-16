@@ -236,14 +236,14 @@ const styles = StyleSheet.create({
   },
   rightActionsContainer: {
     flexDirection: 'row',
-    width: 160,
     height: '88%',
     marginBottom: 12,
+    justifyContent: 'flex-end',
   },
   rightAction: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    width: 80,
     borderRadius: 20,
     marginLeft: 8,
   },

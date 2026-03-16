@@ -16,6 +16,20 @@ export const requestNotificationPermissions = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+    await Notifications.setNotificationChannelAsync('progress', {
+      name: 'Indirme Ilerlemesi',
+      importance: Notifications.AndroidImportance.LOW,
+      vibrationPattern: null,
+      playSound: false,
+    });
+  }
   return finalStatus === 'granted';
 };
 
@@ -27,6 +41,8 @@ export const sendLocalNotification = async (title, body, data = {}) => {
       data,
       sound: true,
     },
-    trigger: null, // send immediately
+    trigger: {
+      channelId: 'default',
+    },
   });
 };

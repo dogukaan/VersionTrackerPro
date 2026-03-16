@@ -120,7 +120,9 @@ export const downloadAndInstallApk = async (apkUrl, fileName, onProgress, token 
               sticky: true,
               color: '#007AFF',
             },
-            trigger: null,
+            trigger: {
+              channelId: 'progress',
+            },
           });
         }
       }
