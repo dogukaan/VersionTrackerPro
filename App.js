@@ -434,6 +434,7 @@ export default function App() {
       workflowRuns={workflowRuns}
       progress={progress}
       handleInstall={handleInstall}
+      handleDeleteApk={handleDeleteApk}
       onHide={handleHideVersion}
       setSelectedVersion={setSelectedVersion}
       setModalVisible={setModalVisible}

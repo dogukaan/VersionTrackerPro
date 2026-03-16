@@ -74,7 +74,7 @@ export const ReleaseItem = ({
 
   const renderRightActions = (progressAnimatedValue, dragAnimatedValue) => {
     const trans = dragAnimatedValue.interpolate({
-      inputRange: [-80, 0],
+      inputRange: [-160, 0],
       outputRange: [1, 0],
       extrapolate: 'clamp',
     });
