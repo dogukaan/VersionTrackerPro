@@ -1,8 +1,9 @@
 name: Build Android APK
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+      - master
 
 permissions:
   contents: write
@@ -13,6 +14,47 @@ jobs:
     steps:
       - name: 🏗 Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history to fetch previous tags
+
+      - name: 🏷️ Calculate next version
+        id: versioning
+        run: |
+          # Get the latest tag matching v*
+          LATEST_TAG=$(git describe --tags --match "v*" --abbrev=0 2>/dev/null || echo "v1.5.0")
+
+          # If the tag is exactly v1.5.0 and no tags exist, we start from v1.5.1
+          # Otherwise we parse the tag
+          echo "Latest tag found: $LATEST_TAG"
+
+          # Remove 'v' prefix
+          VERSION=${LATEST_TAG#v}
+
+          # Split into major, minor, patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # Check if parsing was successful, fallback if not
+          if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
+            MAJOR=1
+            MINOR=5
+            PATCH=0
+          fi
+
+          # Increment patch
+          PATCH=$((PATCH + 1))
+
+          # Rollover logic: if patch > 9, increment minor and reset patch
+          if [ $PATCH -gt 9 ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          fi
+
+          # Form the new tag
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "Next tag will be: $NEW_TAG"
+
+          # Save to GITHUB_OUTPUT
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
       - name: ⚙️ Setup Node
         uses: actions/setup-node@v4
@@ -62,8 +104,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: android/app/build/outputs/apk/release/app-release.apk
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ steps.versioning.outputs.tag }}
+          name: ${{ steps.versioning.outputs.tag }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
