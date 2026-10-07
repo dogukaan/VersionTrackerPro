@@ -46,6 +46,7 @@ import {
 } from 'lucide-react-native';
 
 // Services & Components
+import { truncateVersion } from './utils';
 import { storageService } from './services/storageService';
 import { fetchReleases, fetchWorkflowRuns } from './services/githubService';
 import { downloadAndInstallApk, isApkDownloaded, deleteApk } from './services/updateService';
@@ -420,7 +421,7 @@ export default function App() {
         <View style={styles.repoStatus}>
           {item.lastVersion && (
             <View style={[styles.badge, { backgroundColor: theme.accentBg }]}>
-              <Text style={[styles.badgeText, { color: theme.accent }]}>{item.lastVersion}</Text>
+              <Text style={[styles.badgeText, { color: theme.accent }]}>{truncateVersion(item.lastVersion)}</Text>
             </View>
           )}
           <TouchableOpacity onPress={() => handleDeleteRepo(item)} style={[styles.deleteAction, { backgroundColor: theme.iconBg }]}>

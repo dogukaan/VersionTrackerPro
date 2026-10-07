@@ -42,18 +42,11 @@ export const fetchReleases = async (repoOwner, repoName, token = null) => {
       };
     }).filter(release => release !== null);
 
-    // Sort releases by version number (semver-like) descending
+    // Sort releases by publishedAt date descending (newest first)
     return releasesWithApk.sort((a, b) => {
-      const parseVersion = (v) => v.replace(/[^0-9.]/g, '').split('.').map(Number);
-      const vA = parseVersion(a.version);
-      const vB = parseVersion(b.version);
-      
-      for (let i = 0; i < Math.max(vA.length, vB.length); i++) {
-        const numA = vA[i] || 0;
-        const numB = vB[i] || 0;
-        if (numA !== numB) return numB - numA;
-      }
-      return 0;
+      const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return dateB - dateA;
     });
   } catch (error) {
     console.error('Error fetching releases:', error);

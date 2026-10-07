@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { X, Download, Box, FileText, GitCommit, Clock, User, Trash2 } from 'lucide-react-native';
 import { fetchFileContent, fetchCommits } from '../services/githubService';
+import { truncateVersion } from '../utils';
 
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -74,7 +75,7 @@ export const VersionModal = ({ visible, version, onClose, onInstall, onDeleteApk
           <View style={styles.modalView}>
             <View style={styles.header}>
               <View style={styles.titleGroup}>
-                <Text style={[styles.versionTag, { color: themeByMode.text }]}>{version.version}</Text>
+                <Text style={[styles.versionTag, { color: themeByMode.text }]}>{version.version ? truncateVersion(version.version) : ''}</Text>
                 <Text style={[styles.releaseName, { color: themeByMode.subText }]}>{version.name}</Text>
               </View>
               <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: themeByMode.iconBg }]}>
