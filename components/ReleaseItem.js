@@ -20,6 +20,7 @@ import {
   Box
 } from 'lucide-react-native';
 import { GlassCard } from './GlassCard';
+import { truncateVersion } from '../utils';
 
 export const ReleaseItem = ({ 
   item, 
@@ -119,7 +120,7 @@ export const ReleaseItem = ({
         <GlassCard isDarkMode={isDarkMode} style={[styles.releaseCard, { backgroundColor: theme.card, borderLeftWidth: isBuilding ? 4 : 1, borderLeftColor: isBuilding ? theme.accent : theme.border }]}>
           <Animated.View style={[styles.releaseContainer, isBuilding && { transform: [{ scale: pulseAnim }] }]}>
             <View style={styles.releaseLeft}>
-              <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version || 'Bilinmiyor'}</Text>
+              <Text style={[styles.versionLabel, { color: theme.text }]}>{item.version ? truncateVersion(item.version) : 'Bilinmiyor'}</Text>
               <Text style={[styles.releaseDate, { color: theme.subText }]}>
                 {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('tr-TR') : 'Yayınlanıyor...'}
                 {isDownloaded && <Text style={{ color: theme.success, fontWeight: '900' }}> • İNDİRİLDİ</Text>}
