@@ -82,9 +82,6 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: 🤖 Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: 🏗 Prebuild Expo
         run: npx expo prebuild --platform android --no-install
 
