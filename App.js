@@ -111,6 +111,26 @@ export default function App() {
   useEffect(() => {
     loadRepos();
     setupApp();
+
+    // Listen for user tapping on a notification
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data && data.action === 'download_update' && data.apkUrl && data.fileName) {
+        console.log('[App] Notification tapped, initiating background update download:', data.fileName);
+        handleInstall({
+          version: data.version,
+          apkAsset: {
+            name: data.fileName,
+            downloadUrl: data.apkUrl,
+            apiUrl: data.apkUrl,
+          }
+        }, data.token);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const setupApp = async () => {

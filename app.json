@@ -19,7 +19,8 @@
       "permissions": [
         "REQUEST_INSTALL_PACKAGES",
         "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "VIBRATE"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

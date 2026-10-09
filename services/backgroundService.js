@@ -34,20 +34,20 @@ TaskManager.defineTask(BACKGROUND_UPDATE_TASK, async () => {
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: 'Yeni Güncelleme Bulundu!',
-                body: `${repo.name} için ${latest.version} sürümü otomatik indiriliyor.`,
+                body: `${repo.name} projesi için ${latest.version} sürümü yayınlandı. İndirmek için dokunun.`,
+                data: {
+                  action: 'download_update',
+                  repoId: repo.id,
+                  apkUrl: latest.apkAsset.apiUrl || latest.apkAsset.downloadUrl,
+                  fileName: latest.apkAsset.name,
+                  token: repo.token,
+                  version: latest.version
+                }
               },
               trigger: null,
             });
 
-            // Trigger download/install
-            // Note: This might be restricted by background execution limits on some Android versions.
-            await downloadAndInstallApk(
-              latest.apkAsset.apiUrl || latest.apkAsset.downloadUrl,
-              latest.apkAsset.name,
-              null,
-              repo.token
-            );
-
+            // Sadece versiyonu güncelle, indirme işlemini bildirime tıklanınca yapacağız (Foreground)
             await storageService.updateRepoVersion(repo.id, latest.version);
             updatesFound++;
           }

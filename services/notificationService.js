@@ -22,6 +22,8 @@ export const requestNotificationPermissions = async () => {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
     });
     await Notifications.setNotificationChannelAsync('progress', {
       name: 'Indirme Ilerlemesi',
